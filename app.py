@@ -59,6 +59,13 @@ AUDIO_MIME = {
     ".oga": "audio/ogg", ".opus": "audio/ogg", ".wma": "audio/x-ms-wma",
     ".amr": "audio/amr",
 }
+VIDEO_MIME = {
+    ".mp4": "video/mp4", ".mov": "video/quicktime", ".mkv": "video/x-matroska",
+    ".avi": "video/x-msvideo", ".webm": "video/webm", ".flv": "video/x-flv",
+    ".wmv": "video/x-ms-wmv", ".m4v": "video/mp4", ".ts": "video/mp2t",
+    ".mpeg": "video/mpeg", ".mpg": "video/mpeg", ".3gp": "video/3gpp",
+}
+FILE_MIME = {**AUDIO_MIME, **VIDEO_MIME}
 
 
 def _ext(filename: str) -> str:
@@ -110,10 +117,13 @@ def _file_info(item: dict) -> dict:
 
 
 def _store_file(src_path: str, name: str, kind: str) -> dict:
-    """把处理结果移入持久化目录并登记，返回文件信息（含链接）。"""
-    ext = _ext(name) or ".mp3"
-    if ext not in AUDIO_MIME:
-        ext = ".mp3"
+    """把处理结果移入持久化目录并登记，返回文件信息（含链接）。
+
+    保留文件真实扩展名（音频或视频均可），不再强制归入音频类型。
+    """
+    ext = _ext(name)
+    if not ext:
+        ext = ".bin"
     os.makedirs(STORAGE_FILES, exist_ok=True)
 
     items = _load_index()
@@ -207,7 +217,7 @@ def serve_file(fid: str):
     as_attachment = request.args.get("download") in ("1", "true", "yes")
     return send_from_directory(
         STORAGE_FILES, filename,
-        mimetype=AUDIO_MIME.get(item["ext"], "application/octet-stream"),
+        mimetype=FILE_MIME.get(item["ext"], "application/octet-stream"),
         as_attachment=as_attachment,
         download_name=item["name"],
     )
@@ -241,14 +251,19 @@ def api_delete_file(fid: str):
 
 @app.post("/api/video-to-mp3")
 def api_video_to_mp3():
-    files = [f for f in (request.files.getlist("videos") + request.files.getlist("video")) if f and f.filename]
-    if not files:
-        return jsonify({"ok": False, "error": "请先上传视频文件"}), 400
-
-    for f in files:
-        ext = _ext(f.filename)
-        if ext not in VIDEO_EXT:
+    uploads = [f for f in (request.files.getlist("videos") + request.files.getlist("video")) if f and f.filename]
+    ids = [s.strip() for s in (request.form.getlist("ids") or []) if s.strip()]
+    if not uploads and not ids:
+        return jsonify({"ok": False, "error": "请先上传或选择视频文件"}), 400
+    for f in uploads:
+        if _ext(f.filename) not in VIDEO_EXT:
             return jsonify({"ok": False, "error": f"不支持的视频格式：{f.filename}"}), 400
+    for vid in ids:
+        item = _find_file(vid)
+        if not item:
+            return jsonify({"ok": False, "error": f"文件库中不存在：{vid}"}), 400
+        if item["ext"] not in VIDEO_EXT:
+            return jsonify({"ok": False, "error": f"该文件不是视频：{item['name']}"}), 400
 
     try:
         fmt = _get_format()
@@ -263,12 +278,20 @@ def api_video_to_mp3():
     workdir = tempfile.mkdtemp(prefix="vid_", dir=WORK_DIR)
 
     try:
-        results = []
-        for i, f in enumerate(files):
-            in_path = os.path.join(workdir, f"in_{i:04d}" + _ext(f.filename))
+        inputs = []  # (path, base_name)
+        for f in uploads:
+            in_path = os.path.join(workdir, f"in_{len(inputs):04d}" + _ext(f.filename))
             f.save(in_path)
+            base = _safe_display_name(os.path.splitext(f.filename)[0]) or f"video_{len(inputs) + 1}"
+            inputs.append((in_path, base))
+        for vid in ids:
+            item = _find_file(vid)
+            in_path = os.path.join(STORAGE_FILES, vid + item["ext"])
+            base = _safe_display_name(os.path.splitext(item["name"])[0]) or f"video_{len(inputs) + 1}"
+            inputs.append((in_path, base))
 
-            base = _safe_display_name(os.path.splitext(f.filename)[0]) or f"video_{i + 1}"
+        results = []
+        for i, (in_path, base) in enumerate(inputs):
             tmp_out = os.path.join(workdir, f"out_{i:04d}" + FORMAT_EXT[fmt])
             video_to_audio(in_path, tmp_out, fmt)
             results.append(_store_file(tmp_out, base + FORMAT_EXT[fmt], "video"))
@@ -301,6 +324,42 @@ def api_video_to_mp3():
         shutil.rmtree(workdir, ignore_errors=True)
 
     return jsonify({"ok": True, "files": results, "merged": merged})
+
+
+# ---------------- 通用上传（视频/音频 原文件落盘，返回可引用 id） ----------------
+
+@app.post("/api/upload")
+def api_upload():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"ok": False, "error": "请选择文件"}), 400
+
+    ext = _ext(f.filename)
+    custom = (request.form.get("name") or "").strip()
+    if custom:
+        name = _safe_display_name(custom)
+        if ext and not name.lower().endswith(ext):
+            name += ext
+    else:
+        name = _safe_display_name(f.filename) or ("file" + (ext or ""))
+    if ext and not name.lower().endswith(ext):
+        name += ext
+
+    kind = "video_src" if ext in VIDEO_EXT else "audio_src"
+
+    os.makedirs(WORK_DIR, exist_ok=True)
+    workdir = tempfile.mkdtemp(prefix="up_", dir=WORK_DIR)
+    try:
+        tmp = os.path.join(workdir, "raw" + (ext or ""))
+        f.save(tmp)
+        info = _store_file(tmp, name, kind)
+    except Exception:
+        shutil.rmtree(workdir, ignore_errors=True)
+        return jsonify({"ok": False, "error": "服务器内部错误，请重试"}), 500
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+    return jsonify({"ok": True, "file": info})
 
 
 def _stored_ext(fid: str) -> str:

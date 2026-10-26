@@ -22,12 +22,14 @@
 >
 > 链接说明：文件保存在 Render 临时磁盘中，**服务重新部署或超过 48 小时后链接会失效**，重要文件请及时下载到本地。
 
-## 🛠 技术栈
+## 🛡 抗网络波动设计（重要）
 
-- Python 3.11 + Flask 3
-- ffmpeg / ffprobe（libmp3lame + flac 编码）
-- gunicorn 作为生产服务器
-- Docker（Debian slim + 官方源 ffmpeg）
+早先版本把「上传 + 处理」放在**同一个请求**里，网络一抖就前功尽弃。现改为**两阶段**：
+
+1. **先上传**：选完视频/音频后，文件会**立即单独上传并落盘**，每个文件独立保存、显示文件名/大小/时长，单个失败可单独重试——不会连累其他文件。
+2. **后处理**：点「开始转换 / 开始合成」时，**只发送一个很小的文件清单（id 列表）**，不再是几 MB 的大请求，断网几乎断不了。即便处理阶段网络中断，已上传的文件依然安全，直接重按一次按钮即可重新生成链接。
+
+前端对所有上传请求都加了**自动重试（网络层错误最多重试 3 次，指数退避）**，HTTP 错误（如文件过大）不会无意义重发。
 
 ## 🚀 本地运行
 
@@ -42,21 +44,35 @@ python3 app.py
 
 ## 📡 API
 
-### `POST /api/video-to-mp3` — 批量视频转音频
+### `POST /api/upload` — 通用上传（原文件落盘，返回可引用 id）
 
 | 参数 | 说明 |
 | --- | --- |
-| `videos` | 视频文件，可多次传入（必填） |
-| `gaps` | 与 videos 对应的间隔秒数（合并时生效，默认 0） |
+| `file` | 视频或音频文件（必填） |
+| `name` | 自定义名称（可选，会保留原扩展名） |
+
+返回 `{ok, file: {id, name, url, size, duration, kind}}`。视频类 `kind=video_src`，音频类 `kind=audio_src`。
+
+### `POST /api/video-to-mp3` — 视频转音频（支持 ids 引用已上传文件）
+
+| 参数 | 说明 |
+| --- | --- |
+| `videos` | 视频文件，可多次传入（与 `ids` 二选一或混合） |
+| `ids` | 已通过 `/api/upload` 上传的视频 id，可多次传入 |
+| `gaps` | 与视频顺序对应的间隔秒数（合并时生效，默认 0） |
 | `format` | `flac`（默认，无损）/ `wav`（无损）/ `mp3` |
 | `merge` | `1` = 转换后合并为一段（默认 `0`） |
 
-返回 `{ok, files: [...], merged: {...}|null}`，每个文件含 `id / name / url / size / duration`。
+返回 `{ok, files: [...], merged: {...}|null}`。
 
 ```bash
-curl -F "videos=@a.mp4" -F "gaps=1.5" \
-     -F "videos=@b.mp4" -F "gaps=2" \
-     -F "format=flac" -F "merge=1" \
+# 两阶段：先上传拿 id，再用 ids 转换（推荐，抗断网）
+curl -F "file=@a.mp4" http://127.0.0.1:5000/api/upload   # 拿到 id
+curl -F "ids=<id>" -F "gaps=1.5" -F "format=flac" -F "merge=1" \
+     http://127.0.0.1:5000/api/video-to-mp3
+
+# 也支持传统整包上传
+curl -F "videos=@a.mp4" -F "gaps=1.5" -F "format=flac" -F "merge=1" \
      http://127.0.0.1:5000/api/video-to-mp3
 ```
 
@@ -64,15 +80,14 @@ curl -F "videos=@a.mp4" -F "gaps=1.5" \
 
 | 参数 | 说明 |
 | --- | --- |
-| `files` | 上传的音频文件（可多次） |
-| `order` | JSON 数组，规定合成顺序：`[{"type":"upload","ref":"0","gap":1.5}, {"type":"id","ref":"a1b2c3d4","gap":0}]`。`upload` 的 ref 是 files 中的下标，`id` 的 ref 是文件库链接 ID |
-| `format` | `flac`（默认）/ `wav` / `mp3` |
+| `order` | JSON 数组，规定合成顺序：`[{"type":"id","ref":"a1b2c3d4","gap":1.5}, ...]`。`ref` 为文件库链接 ID，`gap` 为该音频后的静音秒数 |
+
+> 前端现在统一用 `type:"id"` 引用已上传/已生成的文件，因此合成请求体很小、抗断网。
 
 返回 `{ok, file: {...}}`。
 
 ```bash
-curl -F "files=@x.mp3" -F "files=@y.mp3" \
-     -F 'order=[{"type":"upload","ref":"0","gap":1},{"type":"upload","ref":"1","gap":0}]' \
+curl -F 'order=[{"type":"id","ref":"a1b2c3d4","gap":1},{"type":"id","ref":"e5f6a7b8","gap":0}]' \
      -F "format=flac" \
      http://127.0.0.1:5000/api/merge
 ```

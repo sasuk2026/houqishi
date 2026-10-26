@@ -93,6 +93,10 @@
     border: 1px solid rgba(177, 108, 255, 0.4);
     border-radius: 6px; padding: 1px 6px; margin-right: 6px;
   }
+  .row-status { font-size: 12.5px; color: var(--muted); flex: none; }
+  .row-status.up { color: #ffd479; }
+  .row-status.err { color: var(--err); }
+  .row-status.ok { color: var(--ok); }
   .gap { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
   .gap input, .text-input {
     font: inherit;
@@ -129,6 +133,8 @@
   button.ghost:hover { border-color: var(--accent); }
   button.small { padding: 6px 12px; font-size: 12.5px; box-shadow: none; }
   button.danger { background: transparent; border: 1px solid rgba(255, 107, 129, 0.5); color: var(--err); box-shadow: none; }
+  .icon-btn { background: transparent; border: 1px solid var(--border); color: var(--muted); box-shadow: none; padding: 6px 10px; font-size: 12.5px; }
+  .icon-btn:hover { color: var(--err); border-color: var(--err); }
 
   .actions { margin-top: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
   .check-line {
@@ -221,11 +227,11 @@
   .kind-badge.k-video { color: #8fd0ff; border-color: rgba(143, 208, 255, 0.4); }
   .kind-badge.k-merge { color: #ffb08f; border-color: rgba(255, 176, 143, 0.4); }
   .kind-badge.k-import { color: #9fffc0; border-color: rgba(159, 255, 192, 0.4); }
-  .empty-tip { color: var(--muted); font-size: 13px; padding: 18px 0; text-align: center; }
+  .kind-badge.k-audio_src { color: #9fffc0; border-color: rgba(159, 255, 192, 0.4); }
+  .kind-badge.k-video_src { color: #8fd0ff; border-color: rgba(143, 208, 255, 0.4); }
 
   .import-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
   .import-row input[type="text"] { flex: 1 1 220px; }
-  .import-row input[type="file"] { flex: 1 1 260px; }
 
   footer { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 40px; opacity: 0.7; }
   .toast {
@@ -235,7 +241,7 @@
     padding: 10px 20px; border-radius: 10px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     opacity: 0; pointer-events: none; transition: opacity 0.25s;
-    z-index: 99;
+    z-index: 99; max-width: 90vw;
   }
   .toast.show { opacity: 1; }
   @media (max-width: 560px) {
@@ -254,11 +260,11 @@
   <!-- 视频转音频（批量 + 合并） -->
   <section class="card">
     <h2>🎬 视频转 MP3 <span class="tag">批量 + 合并</span></h2>
-    <p class="desc">一次可选择<b>多个视频</b>（也可分批多次转换）。勾选「转换后合并」即按下方每个视频的间隔拼成一段。想分批转换后再合并？转换后到「🎵 音频合成」里从<b>文件库</b>选取即可。</p>
+    <p class="desc">选择一个或多个视频，系统会<b>逐个立刻上传保存</b>（网络波动也不怕，单个失败可重试），再点「开始转换」即可。勾选「转换后合并」按每个视频的间隔拼成一段。想分批转换后再合并？转换后到「🎵 音频合成」里从<b>文件库</b>选取即可。</p>
     <div class="drop-zone" id="video-drop">
       <div class="icon">🎥</div>
       <div>点击选择，或将多个视频拖放到这里</div>
-      <div class="hint">单次请求合计最大 200MB</div>
+      <div class="hint">每个视频单独上传保存，单次最大 200MB</div>
     </div>
     <input type="file" id="video-input" accept="video/*" multiple hidden>
     <div class="file-list" id="video-list"></div>
@@ -279,7 +285,7 @@
   <!-- 多音频合成 -->
   <section class="card">
     <h2>🎵 音频合成 <span class="tag">上传 + 文件库</span></h2>
-    <p class="desc">按顺序添加音频：可以上传新文件，也可以从<b>文件库</b>选择已生成的链接，两者可混合排序。为每个音频设置间隔秒数（该音频播放结束后的静音时长）。</p>
+    <p class="desc">按顺序添加音频：点「＋ 上传音频」选文件后<b>立即保存并显示文件名</b>，也可从<b>文件库</b>选择已生成的链接，两者可混合排序。每个音频可设置间隔秒数（该音频播放结束后的静音时长）。合成时只发送文件清单，体积小、不怕断网。</p>
     <div class="merge-rows" id="merge-rows"></div>
     <div class="actions">
       <button class="ghost" id="btn-add-row">＋ 上传音频</button>
@@ -324,7 +330,7 @@
   <!-- 文件库 -->
   <section class="card">
     <h2>📚 文件库 <span class="tag">所有链接</span></h2>
-    <p class="desc">所有转换 / 合成 / 导入的产物都在这里，链接可直接复制分享。文件保存在服务临时磁盘，<b>重新部署或超过 48 小时会自动清理</b>，重要文件请及时下载。</p>
+    <p class="desc">所有转换 / 合成 / 导入 / 上传的产物都在这里，链接可直接复制分享。文件保存在服务临时磁盘，<b>重新部署或超过 48 小时会自动清理</b>，重要文件请及时下载。</p>
     <div class="actions">
       <button class="ghost" id="btn-refresh-library">🔄 刷新</button>
     </div>
@@ -346,10 +352,11 @@
 <script>
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => document.querySelectorAll(s);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const state = {
-    videos: [],     // {file, name, size, gap}
-    mergeRows: [],  // {type:'upload'|'id', ref, name, gap, file}
+    videos: [],     // {id, name, size, duration, gap, status, err}
+    mergeRows: [],  // {type:'upload'|'id', id, name, size, duration, url, gap, status, err, file}
     library: [],
   };
 
@@ -376,7 +383,10 @@
       { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
     ));
   }
-  const KIND_LABEL = { video: ['视频转换', 'k-video'], merge: ['合成', 'k-merge'], import: ['导入', 'k-import'] };
+  const KIND_LABEL = {
+    video: ['视频转换', 'k-video'], merge: ['合成', 'k-merge'], import: ['导入', 'k-import'],
+    audio_src: ['音频源', 'k-audio_src'], video_src: ['视频源', 'k-video_src'],
+  };
 
   let toastTimer = null;
   function toast(msg) {
@@ -384,7 +394,7 @@
     t.textContent = msg;
     t.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
   }
 
   async function copyText(text) {
@@ -404,12 +414,48 @@
     }
   }
 
+  // 普通请求（含 JSON 解析与错误抛出）
   async function apiPost(url, fd) {
     const res = await fetch(url, { method: 'POST', body: fd });
     let data = {};
     try { data = await res.json(); } catch (e) { /* ignore */ }
     if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + res.status));
     return data;
+  }
+
+  // 带重试的请求：仅在真正的网络层错误（fetch 抛异常）时重试，
+  // 不重试 HTTP 错误响应（如 413 过大），避免无意义重发。
+  async function apiPostWithRetry(url, fd, retries = 3) {
+    let lastErr;
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        return await apiPost(url, fd);
+      } catch (e) {
+        const isNetwork = (e instanceof TypeError) || /Failed to fetch|NetworkError|network|timeout/i.test(e.message || '');
+        if (isNetwork && attempt < retries) {
+          lastErr = e;
+          await sleep(600 * (attempt + 1));
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw lastErr;
+  }
+
+  // 上传单个文件（带重试与状态回调），返回 {ok, file} 或抛错
+  async function uploadFile(file, onProgress) {
+    const fd = new FormData();
+    fd.append('file', file);
+    onProgress && onProgress('uploading');
+    try {
+      const data = await apiPostWithRetry('/api/upload', fd);
+      onProgress && onProgress('done', data.file);
+      return data.file;
+    } catch (e) {
+      onProgress && onProgress('error', null, e.message);
+      throw e;
+    }
   }
 
   function linkCardHTML(file) {
@@ -427,7 +473,6 @@
     </div>`;
   }
 
-  // 结果区复制按钮（事件委托）
   document.addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-copy]');
     if (!btn) return;
@@ -454,25 +499,56 @@
   const videoFormat = bindFormatPicker('#video-format');
   const mergeFormat = bindFormatPicker('#merge-format');
 
-  /* ---------- 视频卡片 ---------- */
+  /* ---------- 视频卡片（先逐个上传保存，再转换） ---------- */
   const videoDrop = $('#video-drop');
   const videoInput = $('#video-input');
 
   function renderVideos() {
     const wrap = $('#video-list');
-    wrap.innerHTML = state.videos.map((v, i) => `
-      <div class="file-row has-file">
+    wrap.innerHTML = state.videos.map((v, i) => {
+      let inner;
+      if (v.status === 'uploading') {
+        inner = `<span class="fname">${esc(v.name)} <small>(${fmtBytes(v.size)})</small></span><span class="row-status up">⬆️ 上传中…</span>`;
+      } else if (v.status === 'error') {
+        inner = `<span class="fname">${esc(v.name)} <small>(${fmtBytes(v.size)})</small></span><span class="row-status err">⚠️ ${esc(v.err || '上传失败')}</span><button class="icon-btn small" data-vretry="${i}">重试</button>`;
+      } else {
+        inner = `<span class="fname">${esc(v.name)} <small>(${fmtBytes(v.size)}${v.duration != null ? ' · ' + fmtDur(v.duration) : ''})</small></span>`;
+      }
+      return `<div class="file-row ${v.id ? 'has-file' : ''}">
         <span class="row-index">${i + 1}</span>
-        <span class="fname" title="${esc(v.name)}">${esc(v.name)} <small>(${fmtBytes(v.size)})</small></span>
+        ${inner}
         <div class="gap"><span>间隔</span><input type="number" min="0" step="0.1" value="${v.gap}" data-vgap="${i}"><span>秒</span></div>
         <button class="icon-btn danger small" data-vdel="${i}" title="移除">✕</button>
-      </div>`).join('');
-    $('#btn-video').disabled = state.videos.length === 0;
+      </div>`;
+    }).join('');
+    $('#btn-video').disabled = !state.videos.some((v) => v.id);
   }
 
-  function addVideos(fileList) {
+  async function addVideos(fileList) {
     for (const f of fileList) {
-      state.videos.push({ file: f, name: f.name, size: f.size, gap: 0 });
+      const item = { id: null, name: f.name, size: f.size, duration: null, gap: 0, status: 'uploading', err: '', file: f };
+      state.videos.push(item);
+      renderVideos();
+      try {
+        const info = await uploadFile(f);
+        item.id = info.id; item.name = info.name; item.size = info.size; item.duration = info.duration; item.status = 'done';
+      } catch (e) {
+        item.status = 'error'; item.err = e.message;
+      }
+      renderVideos();
+    }
+  }
+
+  async function retryVideo(i) {
+    const v = state.videos[i];
+    if (!v || !v.file) { toast('该文件需重新选择后再上传'); state.videos.splice(i, 1); renderVideos(); return; }
+    v.status = 'uploading'; v.err = '';
+    renderVideos();
+    try {
+      const info = await uploadFile(v.file);
+      v.id = info.id; v.name = info.name; v.size = info.size; v.duration = info.duration; v.status = 'done';
+    } catch (e) {
+      v.status = 'error'; v.err = e.message;
     }
     renderVideos();
   }
@@ -492,21 +568,33 @@
 
   $('#video-list').addEventListener('click', (e) => {
     const del = e.target.closest('button[data-vdel]');
-    if (!del) return;
-    state.videos.splice(Number(del.dataset.vdel), 1);
-    renderVideos();
+    if (del) {
+      state.videos.splice(Number(del.dataset.vdel), 1);
+      renderVideos();
+      return;
+    }
+    const retry = e.target.closest('button[data-vretry]');
+    if (retry) { retryVideo(Number(retry.dataset.vretry)); }
+  });
+  // 间隔输入实时写入 state
+  $('#video-list').addEventListener('input', (e) => {
+    const inp = e.target.closest('input[data-vgap]');
+    if (inp) state.videos[Number(inp.dataset.vgap)].gap = Math.max(0, parseFloat(inp.value) || 0);
   });
 
   $('#btn-video').addEventListener('click', async () => {
-    if (!state.videos.length) return;
+    const ready = state.videos.filter((v) => v.id);
+    if (!ready.length) return;
+    const pending = state.videos.some((v) => v.status === 'uploading' || v.status === 'error');
+    if (pending) { toast('还有视频未上传完成，请等待或重试'); return; }
     const btn = $('#btn-video');
     btn.disabled = true;
-    $('#video-status').textContent = `⏳ 正在转换 ${state.videos.length} 个视频${$('#video-merge').checked ? '并合并' : ''}，请稍候…`;
+    $('#video-status').textContent = `⏳ 正在转换 ${ready.length} 个视频${$('#video-merge').checked ? '并合并' : ''}，请稍候…`;
     $('#video-status').className = 'status busy';
     try {
       const fd = new FormData();
-      state.videos.forEach((v) => fd.append('videos', v.file));
-      $$('#video-list input[data-vgap]').forEach((i) => fd.append('gaps', i.value || '0'));
+      ready.forEach((v) => fd.append('ids', v.id));
+      ready.forEach((v) => fd.append('gaps', String(v.gap || 0)));
       fd.append('format', videoFormat.value);
       fd.append('merge', $('#video-merge').checked ? '1' : '0');
       const data = await apiPost('/api/video-to-mp3', fd);
@@ -531,30 +619,47 @@
     }
   });
 
-  /* ---------- 合成卡片 ---------- */
+  /* ---------- 合成卡片（上传即保存、清晰显示、仅发清单合成） ---------- */
   function renderMergeRows() {
     const wrap = $('#merge-rows');
-    wrap.innerHTML = state.mergeRows.map((r, i) => `
-      <div class="file-row ${r.file || r.type === 'id' ? 'has-file' : ''}">
+    wrap.innerHTML = state.mergeRows.map((r, i) => {
+      let body;
+      if (r.type === 'upload') {
+        if (!r.id && r.status !== 'uploading' && r.status !== 'error') {
+          // 尚未选择文件
+          body = `<input type="file" class="audio-file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" data-mfile="${i}" style="flex:1 1 200px;min-width:0">`;
+        } else if (r.status === 'uploading') {
+          body = `<span class="fname">${esc(r.name || '音频')} <small>(${fmtBytes(r.size || 0)})</small></span><span class="row-status up">⬆️ 上传中…</span>`;
+        } else if (r.status === 'error') {
+          body = `<span class="fname">${esc(r.name || '音频')}</span><span class="row-status err">⚠️ ${esc(r.err || '上传失败')}</span><button class="icon-btn small" data-mretry="${i}">重试</button>`;
+        } else {
+          const url = r.url ? location.origin + r.url : '';
+          body = `<span class="fname">${esc(r.name)} <small>(${fmtBytes(r.size)}${r.duration != null ? ' · ' + fmtDur(r.duration) : ''})</small></span>`
+            + (url ? `<a class="icon-btn small" href="${esc(r.url)}" target="_blank" rel="noopener">🔊 试听</a>` : '')
+            + `<button class="icon-btn small" data-mre="${i}">重选</button>`;
+        }
+      } else {
+        body = `<span class="fname"><span class="lib-tag">文件库</span>${esc(r.name)} <small>(${fmtBytes(r.size)}${r.duration != null ? ' · ' + fmtDur(r.duration) : ''})</small></span>`;
+      }
+      return `<div class="file-row ${r.id || r.type === 'id' ? 'has-file' : ''}">
         <span class="row-index">${i + 1}</span>
-        ${r.type === 'upload'
-          ? `<input type="file" class="audio-file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" data-mfile="${i}" style="flex:1 1 200px;min-width:0">`
-          : `<span class="fname"><span class="lib-tag">文件库</span>${esc(r.name)}</span>`}
+        ${body}
         <div class="gap"><span>间隔</span><input type="number" min="0" step="0.1" value="${r.gap}" data-mgap="${i}"><span>秒</span></div>
         <button class="icon-btn danger small" data-mdel="${i}" title="移除">✕</button>
-      </div>`).join('');
-    $('#btn-merge').disabled = !state.mergeRows.some((r) => r.file || r.type === 'id');
+      </div>`;
+    }).join('');
+    $('#btn-merge').disabled = !state.mergeRows.some((r) => r.id || r.type === 'id');
   }
 
   function addUploadRow() {
-    state.mergeRows.push({ type: 'upload', ref: null, name: '', gap: 0, file: null });
+    state.mergeRows.push({ type: 'upload', id: null, name: '', size: 0, duration: null, url: '', gap: 0, status: 'empty', err: '', file: null });
     renderMergeRows();
   }
 
   function addLibraryRows(ids) {
     for (const id of ids) {
       const f = state.library.find((x) => x.id === id);
-      if (f) state.mergeRows.push({ type: 'id', ref: id, name: f.name, gap: 0, file: null });
+      if (f) state.mergeRows.push({ type: 'id', id, name: f.name, size: f.size, duration: f.duration, url: f.url, gap: 0 });
     }
     renderMergeRows();
   }
@@ -564,45 +669,67 @@
     const inp = e.target.closest('input[data-mfile]');
     if (!inp || !inp.files.length) return;
     const idx = Number(inp.dataset.mfile);
-    state.mergeRows[idx].file = inp.files[0];
-    state.mergeRows[idx].name = inp.files[0].name;
+    const file = inp.files[0];
+    const r = state.mergeRows[idx];
+    r.name = file.name; r.size = file.size; r.status = 'uploading'; r.err = ''; r.file = file;
     renderMergeRows();
+    uploadFile(file, (st, info, errMsg) => {
+      if (st === 'done') {
+        r.id = info.id; r.name = info.name; r.size = info.size; r.duration = info.duration; r.url = info.url; r.status = 'done';
+      } else if (st === 'error') {
+        r.status = 'error'; r.err = errMsg;
+      }
+      renderMergeRows();
+    }).catch(() => {});
   });
   $('#merge-rows').addEventListener('click', (e) => {
     const del = e.target.closest('button[data-mdel]');
-    if (!del) return;
-    state.mergeRows.splice(Number(del.dataset.mdel), 1);
-    renderMergeRows();
+    if (del) { state.mergeRows.splice(Number(del.dataset.mdel), 1); renderMergeRows(); return; }
+    const re = e.target.closest('button[data-mre]');
+    if (re) {
+      const idx = Number(re.dataset.mre);
+      state.mergeRows[idx] = { type: 'upload', id: null, name: '', size: 0, duration: null, url: '', gap: 0, status: 'empty', err: '', file: null };
+      renderMergeRows();
+      return;
+    }
+    const retry = e.target.closest('button[data-mretry]');
+    if (retry) {
+      const idx = Number(retry.dataset.mretry);
+      const r = state.mergeRows[idx];
+      if (r && r.file) {
+        r.status = 'uploading'; r.err = ''; renderMergeRows();
+        uploadFile(r.file, (st, info, errMsg) => {
+          if (st === 'done') { r.id = info.id; r.name = info.name; r.size = info.size; r.duration = info.duration; r.url = info.url; r.status = 'done'; }
+          else if (st === 'error') { r.status = 'error'; r.err = errMsg; }
+          renderMergeRows();
+        }).catch(() => {});
+      }
+    }
+  });
+  $('#merge-rows').addEventListener('input', (e) => {
+    const inp = e.target.closest('input[data-mgap]');
+    if (inp) state.mergeRows[Number(inp.dataset.mgap)].gap = Math.max(0, parseFloat(inp.value) || 0);
   });
 
   $('#btn-merge').addEventListener('click', async () => {
+    const ready = state.mergeRows.filter((r) => r.id || r.type === 'id');
+    if (!ready.length) return;
+    const pending = state.mergeRows.some((r) => r.type === 'upload' && (!r.id && r.status !== 'empty'));
+    if (pending) { toast('还有音频未上传完成，请等待或点「重试」'); return; }
+
+    const order = ready.map((r) => ({ type: 'id', ref: r.id, gap: r.gap || 0 }));
     const fd = new FormData();
-    const order = [];
-    let uploadCount = 0;
-    state.mergeRows.forEach((r, i) => {
-      const gapInput = $(`#merge-rows input[data-mgap="${i}"]`);
-      const gap = Math.max(0, parseFloat(gapInput ? gapInput.value : r.gap) || 0);
-      if (r.type === 'upload') {
-        if (!r.file) return;
-        fd.append('files', r.file);
-        order.push({ type: 'upload', ref: String(uploadCount), gap });
-        uploadCount++;
-      } else {
-        order.push({ type: 'id', ref: r.ref, gap });
-      }
-    });
-    if (!order.length) return;
     fd.append('order', JSON.stringify(order));
     fd.append('format', mergeFormat.value);
 
     const btn = $('#btn-merge');
     btn.disabled = true;
-    $('#merge-status').textContent = '⏳ 正在合成 ' + order.length + ' 个音频，请稍候…';
+    $('#merge-status').textContent = '⏳ 正在合成 ' + ready.length + ' 个音频，请稍候…';
     $('#merge-status').className = 'status busy';
     try {
       const data = await apiPost('/api/merge', fd);
       $('#merge-results').innerHTML = '<h3>🔗 合成结果</h3>' + linkCardHTML(data.file);
-      $('#merge-status').textContent = '✅ 合成完成，链接已生成';
+      $('#merge-status').textContent = '✅ 合成完成，链接已生成（合成清单体积小，断网也不怕）';
       $('#merge-status').className = 'status ok';
       refreshLibrary();
     } catch (err) {
@@ -623,11 +750,12 @@
 
   function renderLibraryPicker() {
     const list = $('#lp-list');
-    if (!state.library.length) {
+    const audios = state.library.filter((f) => f.kind === 'audio_src' || f.kind === 'import' || f.kind === 'video' || f.kind === 'merge' || f.ext === '.mp3' || f.ext === '.wav' || f.ext === '.flac' || f.ext === '.m4a' || f.ext === '.aac' || f.ext === '.ogg');
+    if (!audios.length) {
       list.innerHTML = '<div class="empty-tip">文件库是空的，先转换 / 导入几个音频吧</div>';
       return;
     }
-    list.innerHTML = state.library.map((f) => `
+    list.innerHTML = audios.map((f) => `
       <label class="lp-item">
         <input type="checkbox" value="${esc(f.id)}">
         <span class="lp-name">${esc(f.name)}</span>
@@ -660,7 +788,7 @@
     $('#import-status').textContent = '⏳ 正在导入…';
     $('#import-status').className = 'status busy';
     try {
-      const data = await apiPost('/api/import', fd);
+      const data = await apiPostWithRetry('/api/import', fd);
       $('#import-results').innerHTML = '<h3>🔗 导入结果</h3>' + linkCardHTML(data.file);
       $('#import-status').textContent = '✅ 导入完成，链接已生成';
       $('#import-status').className = 'status ok';
@@ -692,12 +820,13 @@
     tbody.innerHTML = state.library.map((f) => {
       const kind = KIND_LABEL[f.kind] || ['文件', ''];
       const url = location.origin + f.url;
+      const ext = (f.url || '').slice((f.url || '').lastIndexOf('.'));
       return `<tr>
         <td class="name"><span class="kind-badge ${kind[1]}">${kind[0]}</span>${esc(f.name)}</td>
         <td>${fmtBytes(f.size)}</td>
         <td>${fmtDur(f.duration)}</td>
         <td>${fmtTime(f.createdAt)}</td>
-        <td><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.id)}${esc(f.url.slice(f.url.lastIndexOf('.')))}</a></td>
+        <td><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.id)}${esc(ext)}</a></td>
         <td class="ops">
           <button class="ghost small" data-copy="${esc(url)}">复制</button>
           <a class="ghost small" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;" href="${esc(f.url)}?download=1" download="${esc(f.name)}">下载</a>
