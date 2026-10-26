@@ -1,0 +1,12 @@
+# houqishi Render Blueprint
+services:
+  - type: web
+    name: houqishi
+    runtime: docker
+    repo: https://github.com/sasuk2026/houqishi
+    branch: main
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true

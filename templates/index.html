@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>houqishi · 音频工作台</title>
+<style>
+  :root {
+    --bg: #0f1226;
+    --card: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.12);
+    --text: #e8eaf6;
+    --muted: #9aa0c3;
+    --accent: #7c6cff;
+    --accent-2: #b16cff;
+    --ok: #3ddc97;
+    --err: #ff6b81;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    background:
+      radial-gradient(1100px 700px at 8% -10%, #2b2f6b 0%, transparent 60%),
+      radial-gradient(900px 650px at 110% 8%, #5c2a66 0%, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 48px 20px 96px;
+  }
+  header { text-align: center; margin-bottom: 40px; }
+  header h1 {
+    font-size: 42px;
+    letter-spacing: 2px;
+    background: linear-gradient(120deg, #a89bff, #ff9ec4);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  header p { color: var(--muted); margin-top: 10px; font-size: 15px; }
+  main {
+    max-width: 860px;
+    margin: 0 auto;
+    display: grid;
+    gap: 28px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 28px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  }
+  .card h2 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .card h2 .tag {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px;
+  }
+  .card .desc { color: var(--muted); font-size: 13.5px; margin: 10px 0 20px; line-height: 1.6; }
+
+  .drop-zone {
+    border: 2px dashed rgba(255, 255, 255, 0.25);
+    border-radius: 14px;
+    padding: 42px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    color: var(--muted);
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent);
+    background: rgba(124, 108, 255, 0.08);
+  }
+  .drop-zone .icon { font-size: 34px; margin-bottom: 8px; }
+  .drop-zone .hint { font-size: 13px; margin-top: 6px; opacity: 0.75; }
+
+  .file-info {
+    margin-top: 14px;
+    font-size: 13.5px;
+    color: var(--ok);
+    min-height: 20px;
+    word-break: break-all;
+  }
+  .file-info.active { color: #cdd0ff; }
+
+  button {
+    font: inherit;
+    border: none;
+    border-radius: 10px;
+    padding: 11px 22px;
+    cursor: pointer;
+    color: #fff;
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
+    box-shadow: 0 8px 24px rgba(124, 108, 255, 0.35);
+  }
+  button:hover:not(:disabled) { transform: translateY(-1px); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+  button.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    box-shadow: none;
+    color: var(--text);
+  }
+  .actions { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+
+  .status { margin-top: 16px; font-size: 13.5px; min-height: 20px; }
+  .status.busy { color: #ffd479; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+
+  .merge-rows { display: grid; gap: 12px; }
+  .merge-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    flex-wrap: wrap;
+  }
+  .merge-row.has-file { border-color: rgba(124, 108, 255, 0.55); }
+  .row-index {
+    width: 26px; height: 26px;
+    flex: none;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    font-size: 13px; font-weight: 600;
+  }
+  .merge-row input[type="file"] {
+    flex: 1 1 220px;
+    min-width: 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .merge-row input[type="file"]::file-selector-button {
+    font: inherit;
+    border: none;
+    border-radius: 8px;
+    padding: 7px 14px;
+    margin-right: 10px;
+    color: #fff;
+    background: rgba(124, 108, 255, 0.35);
+    cursor: pointer;
+  }
+  .gap { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .gap input {
+    width: 72px;
+    font: inherit;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 7px 8px;
+    text-align: center;
+  }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    box-shadow: none;
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 8px;
+    flex: none;
+  }
+  .icon-btn:hover { color: var(--err); border-color: var(--err); transform: none; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 44px; opacity: 0.7; }
+  @media (max-width: 560px) {
+    header h1 { font-size: 32px; }
+    .card { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>houqishi</h1>
+  <p>视频转 MP3 · 多音频按间隔合成 —— 一个页面全搞定</p>
+</header>
+
+<main>
+  <!-- 视频转 MP3 -->
+  <section class="card">
+    <h2>🎬 视频转 MP3 <span class="tag">提取音频</span></h2>
+    <p class="desc">把视频文件拖进来（或点击选择），服务器用 ffmpeg 提取音轨并编码为 192kbps MP3。支持 MP4 / MOV / MKV / AVI / WebM 等常见格式。</p>
+    <div class="drop-zone" id="drop-zone">
+      <div class="icon">🎥</div>
+      <div>点击选择，或将视频拖放到这里</div>
+      <div class="hint">单文件最大 200MB</div>
+    </div>
+    <input type="file" id="video-input" accept="video/*" hidden>
+    <div class="file-info" id="video-info"></div>
+    <div class="actions">
+      <button id="btn-video" disabled>开始转换</button>
+    </div>
+    <div class="status" id="video-status"></div>
+  </section>
+
+  <!-- 多音频合成 -->
+  <section class="card">
+    <h2>🎵 多 MP3 合成 <span class="tag">可设间隔</span></h2>
+    <p class="desc">按顺序选择多个音频，「间隔」表示该音频播放结束后插入的静音秒数（支持小数，如 1.5）。最后一个音频的间隔不会生效，末尾不会附加静音。</p>
+    <div class="merge-rows" id="merge-rows"></div>
+    <div class="actions">
+      <button class="ghost" id="btn-add-row">＋ 添加音频</button>
+      <button id="btn-merge" disabled>开始合成</button>
+    </div>
+    <div class="status" id="merge-status"></div>
+  </section>
+</main>
+
+<footer>houqishi · 基于 Flask + ffmpeg · 部署于 Render</footer>
+
+<script>
+  const $ = (s) => document.querySelector(s);
+
+  async function downloadResponse(res, fallbackName) {
+    const blob = await res.blob();
+    let name = fallbackName;
+    const cd = res.headers.get("Content-Disposition") || "";
+    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+    if (m) name = decodeURIComponent(m[1]);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
+  async function readError(res) {
+    try {
+      const data = await res.json();
+      return data.error || ("HTTP " + res.status);
+    } catch (e) {
+      return "HTTP " + res.status;
+    }
+  }
+
+  /* ---------- 视频转 MP3 ---------- */
+  const dropZone = $("#drop-zone");
+  const videoInput = $("#video-input");
+  const videoInfo = $("#video-info");
+  const btnVideo = $("#btn-video");
+  const videoStatus = $("#video-status");
+
+  function setVideoFile(file) {
+    if (!file) return;
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    videoInfo.textContent = "已选择：" + file.name + "（" + sizeMB + " MB）";
+    videoInfo.classList.add("active");
+    btnVideo.disabled = false;
+  }
+  dropZone.addEventListener("click", () => videoInput.click());
+  dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("over"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("over"));
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropZone.classList.remove("over");
+    if (e.dataTransfer.files.length) {
+      videoInput.files = e.dataTransfer.files;
+      setVideoFile(e.dataTransfer.files[0]);
+    }
+  });
+  videoInput.addEventListener("change", () => setVideoFile(videoInput.files[0]));
+
+  btnVideo.addEventListener("click", async () => {
+    const file = videoInput.files[0];
+    if (!file) return;
+    btnVideo.disabled = true;
+    videoStatus.textContent = "⏳ 正在转换，请稍候（大文件可能需要几分钟）…";
+    videoStatus.className = "status busy";
+    try {
+      const fd = new FormData();
+      fd.append("video", file);
+      const res = await fetch("/api/video-to-mp3", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(await readError(res));
+      await downloadResponse(res, "houqishi_audio.mp3");
+      videoStatus.textContent = "✅ 转换完成，已开始下载";
+      videoStatus.className = "status ok";
+    } catch (err) {
+      videoStatus.textContent = "❌ " + err.message;
+      videoStatus.className = "status err";
+    } finally {
+      btnVideo.disabled = false;
+    }
+  });
+
+  /* ---------- 多音频合成 ---------- */
+  const rowsWrap = $("#merge-rows");
+  const btnMerge = $("#btn-merge");
+  const mergeStatus = $("#merge-status");
+
+  function addRow() {
+    const row = document.createElement("div");
+    row.className = "merge-row";
+    row.innerHTML =
+      '<span class="row-index"></span>' +
+      '<input type="file" class="audio-file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac">' +
+      '<div class="gap"><span>间隔</span><input type="number" class="gap-input" min="0" step="0.1" value="0"><span>秒</span></div>' +
+      '<button class="icon-btn remove" title="移除这一行">✕</button>';
+    row.querySelector(".remove").addEventListener("click", () => { row.remove(); refreshRows(); });
+    row.querySelector(".audio-file").addEventListener("change", refreshRows);
+    rowsWrap.appendChild(row);
+    refreshRows();
+  }
+
+  function refreshRows() {
+    const rows = Array.from(rowsWrap.children);
+    rows.forEach((r, i) => {
+      r.querySelector(".row-index").textContent = i + 1;
+      r.querySelector(".remove").style.visibility = rows.length > 1 ? "visible" : "hidden";
+      r.classList.toggle("has-file", !!r.querySelector(".audio-file").files[0]);
+    });
+    btnMerge.disabled = !rows.some((r) => r.querySelector(".audio-file").files[0]);
+  }
+
+  $("#btn-add-row").addEventListener("click", addRow);
+
+  btnMerge.addEventListener("click", async () => {
+    const fd = new FormData();
+    let count = 0;
+    for (const row of rowsWrap.children) {
+      const f = row.querySelector(".audio-file").files[0];
+      if (!f) continue;
+      const g = parseFloat(row.querySelector(".gap-input").value);
+      fd.append("files", f);
+      fd.append("gaps", isNaN(g) || g < 0 ? "0" : String(g));
+      count++;
+    }
+    if (!count) return;
+    btnMerge.disabled = true;
+    mergeStatus.textContent = "⏳ 正在合成 " + count + " 个音频，请稍候…";
+    mergeStatus.className = "status busy";
+    try {
+      const res = await fetch("/api/merge-mp3", { method: "POST", body: fd });
+      if (!res.ok) throw new Error(await readError(res));
+      await downloadResponse(res, "houqishi_merged.mp3");
+      mergeStatus.textContent = "✅ 合成完成，已开始下载";
+      mergeStatus.className = "status ok";
+    } catch (err) {
+      mergeStatus.textContent = "❌ " + err.message;
+      mergeStatus.className = "status err";
+    } finally {
+      btnMerge.disabled = false;
+    }
+  });
+
+  addRow();
+  addRow();
+</script>
+</body>
+</html>
