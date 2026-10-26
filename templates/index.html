@@ -27,7 +27,7 @@
     min-height: 100vh;
     padding: 48px 20px 96px;
   }
-  header { text-align: center; margin-bottom: 40px; }
+  header { text-align: center; margin-bottom: 36px; }
   header h1 {
     font-size: 42px;
     letter-spacing: 2px;
@@ -37,35 +37,27 @@
     -webkit-text-fill-color: transparent;
   }
   header p { color: var(--muted); margin-top: 10px; font-size: 15px; }
-  main {
-    max-width: 860px;
-    margin: 0 auto;
-    display: grid;
-    gap: 28px;
-  }
+  main { max-width: 880px; margin: 0 auto; display: grid; gap: 26px; }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 18px;
-    padding: 28px;
+    padding: 26px 28px;
     backdrop-filter: blur(10px);
     box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
   }
-  .card h2 { font-size: 20px; display: flex; align-items: center; gap: 10px; }
+  .card h2 { font-size: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .card h2 .tag {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 3px 10px;
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
   }
-  .card .desc { color: var(--muted); font-size: 13.5px; margin: 10px 0 20px; line-height: 1.6; }
+  .card .desc { color: var(--muted); font-size: 13.5px; margin: 10px 0 18px; line-height: 1.7; }
+  .card .desc b { color: #cdd0ff; }
 
   .drop-zone {
     border: 2px dashed rgba(255, 255, 255, 0.25);
     border-radius: 14px;
-    padding: 42px 16px;
+    padding: 36px 16px;
     text-align: center;
     cursor: pointer;
     transition: border-color 0.2s, background 0.2s;
@@ -75,25 +67,55 @@
     border-color: var(--accent);
     background: rgba(124, 108, 255, 0.08);
   }
-  .drop-zone .icon { font-size: 34px; margin-bottom: 8px; }
-  .drop-zone .hint { font-size: 13px; margin-top: 6px; opacity: 0.75; }
+  .drop-zone .icon { font-size: 32px; margin-bottom: 6px; }
+  .drop-zone .hint { font-size: 12.5px; margin-top: 6px; opacity: 0.75; }
 
-  .file-info {
-    margin-top: 14px;
-    font-size: 13.5px;
-    color: var(--ok);
-    min-height: 20px;
-    word-break: break-all;
+  .file-list, .merge-rows { display: grid; gap: 10px; margin-top: 14px; }
+  .file-row {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
   }
-  .file-info.active { color: #cdd0ff; }
+  .file-row.has-file { border-color: rgba(124, 108, 255, 0.55); }
+  .row-index {
+    width: 26px; height: 26px; flex: none;
+    display: grid; place-items: center;
+    border-radius: 50%;
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    font-size: 13px; font-weight: 600;
+  }
+  .fname { flex: 1 1 200px; min-width: 0; font-size: 13.5px; word-break: break-all; }
+  .fname small { color: var(--muted); }
+  .fname .lib-tag {
+    font-size: 11px; color: var(--accent-2);
+    border: 1px solid rgba(177, 108, 255, 0.4);
+    border-radius: 6px; padding: 1px 6px; margin-right: 6px;
+  }
+  .gap { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+  .gap input, .text-input {
+    font: inherit;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 7px 9px;
+  }
+  .gap input { width: 72px; text-align: center; }
+  .text-input { width: 100%; }
+
+  input[type="file"] { color: var(--muted); font-size: 13px; }
+  input[type="file"]::file-selector-button {
+    font: inherit; border: none; border-radius: 8px;
+    padding: 7px 14px; margin-right: 10px;
+    color: #fff; background: rgba(124, 108, 255, 0.35);
+    cursor: pointer;
+  }
 
   button {
-    font: inherit;
-    border: none;
-    border-radius: 10px;
-    padding: 11px 22px;
-    cursor: pointer;
-    color: #fff;
+    font: inherit; border: none; border-radius: 10px;
+    padding: 11px 22px; cursor: pointer; color: #fff;
     background: linear-gradient(120deg, var(--accent), var(--accent-2));
     transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
     box-shadow: 0 8px 24px rgba(124, 108, 255, 0.35);
@@ -101,101 +123,121 @@
   button:hover:not(:disabled) { transform: translateY(-1px); }
   button:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
   button.ghost {
-    background: transparent;
-    border: 1px solid var(--border);
-    box-shadow: none;
-    color: var(--text);
+    background: transparent; border: 1px solid var(--border);
+    box-shadow: none; color: var(--text);
   }
-  .actions { margin-top: 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  button.ghost:hover { border-color: var(--accent); }
+  button.small { padding: 6px 12px; font-size: 12.5px; box-shadow: none; }
+  button.danger { background: transparent; border: 1px solid rgba(255, 107, 129, 0.5); color: var(--err); box-shadow: none; }
 
-  .status { margin-top: 16px; font-size: 13.5px; min-height: 20px; }
+  .actions { margin-top: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .check-line {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13.5px; color: var(--muted); margin-top: 16px; cursor: pointer;
+  }
+  .check-line input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  .status { margin-top: 14px; font-size: 13.5px; min-height: 20px; }
   .status.busy { color: #ffd479; }
   .status.ok { color: var(--ok); }
   .status.err { color: var(--err); }
 
-  .merge-rows { display: grid; gap: 12px; }
-  .merge-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 12px 14px;
-    flex-wrap: wrap;
-  }
-  .merge-row.has-file { border-color: rgba(124, 108, 255, 0.55); }
-  .row-index {
-    width: 26px; height: 26px;
-    flex: none;
-    display: grid; place-items: center;
-    border-radius: 50%;
-    background: linear-gradient(120deg, var(--accent), var(--accent-2));
-    font-size: 13px; font-weight: 600;
-  }
-  .merge-row input[type="file"] {
-    flex: 1 1 220px;
-    min-width: 0;
-    color: var(--muted);
-    font-size: 13px;
-  }
-  .merge-row input[type="file"]::file-selector-button {
-    font: inherit;
-    border: none;
-    border-radius: 8px;
-    padding: 7px 14px;
-    margin-right: 10px;
-    color: #fff;
-    background: rgba(124, 108, 255, 0.35);
-    cursor: pointer;
-  }
-  .gap { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
-  .gap input {
-    width: 72px;
-    font: inherit;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    color: var(--text);
-    padding: 7px 8px;
-    text-align: center;
-  }
-  .icon-btn {
-    background: transparent;
-    border: 1px solid var(--border);
-    box-shadow: none;
-    color: var(--muted);
-    padding: 6px 10px;
-    border-radius: 8px;
-    flex: none;
-  }
-  .icon-btn:hover { color: var(--err); border-color: var(--err); transform: none; }
-
   .format-picker {
-    display: inline-flex;
-    gap: 6px;
+    display: inline-flex; gap: 6px;
     background: rgba(0, 0, 0, 0.25);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 4px;
-    margin-top: 16px;
+    margin-top: 14px;
   }
   .format-picker button {
-    box-shadow: none;
-    background: transparent;
-    padding: 7px 14px;
-    font-size: 13px;
-    border-radius: 8px;
-    color: var(--muted);
+    box-shadow: none; background: transparent;
+    padding: 7px 14px; font-size: 13px; border-radius: 8px; color: var(--muted);
   }
   .format-picker button:hover:not(.active) { color: var(--text); transform: none; }
   .format-picker button.active {
     background: linear-gradient(120deg, var(--accent), var(--accent-2));
     color: #fff;
   }
-  .format-label { font-size: 13px; color: var(--muted); margin-top: 16px; margin-bottom: -10px; }
+  .format-label { font-size: 13px; color: var(--muted); margin-top: 16px; }
 
-  footer { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 44px; opacity: 0.7; }
+  .results { margin-top: 18px; display: grid; gap: 14px; }
+  .results h3 { font-size: 14.5px; color: #cdd0ff; margin-top: 4px; }
+  .link-card {
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: grid; gap: 10px;
+  }
+  .lc-name { font-size: 14.5px; font-weight: 600; word-break: break-all; }
+  .lc-meta { font-size: 12.5px; color: var(--muted); }
+  .lc-url input {
+    width: 100%; font: inherit; font-size: 12.5px;
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid var(--border);
+    border-radius: 8px; color: #a89bff; padding: 8px 10px;
+  }
+  .lc-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .lc-actions a { text-decoration: none; }
+  audio { width: 100%; height: 36px; }
+
+  .library-picker {
+    margin-top: 16px;
+    border: 1px dashed rgba(124, 108, 255, 0.45);
+    border-radius: 12px;
+    padding: 14px 16px;
+    background: rgba(124, 108, 255, 0.05);
+  }
+  .lp-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .lp-head span { font-size: 14px; font-weight: 600; }
+  .lp-list { display: grid; gap: 8px; max-height: 260px; overflow: auto; }
+  .lp-item {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 13px; padding: 7px 10px;
+    background: rgba(0, 0, 0, 0.2); border-radius: 8px;
+  }
+  .lp-item input { accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
+  .lp-item .lp-name { flex: 1; min-width: 0; word-break: break-all; }
+  .lp-item .lp-meta { color: var(--muted); font-size: 12px; flex: none; }
+
+  .lib-table-wrap { margin-top: 14px; overflow-x: auto; }
+  table.lib-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .lib-table th, .lib-table td {
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .lib-table th { color: var(--muted); font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+  .lib-table td.name { word-break: break-all; max-width: 260px; }
+  .lib-table td.ops { white-space: nowrap; }
+  .lib-table td.ops button, .lib-table td.ops a { margin-right: 6px; }
+  .lib-table a { color: #a89bff; text-decoration: none; }
+  .lib-table a:hover { text-decoration: underline; }
+  .kind-badge {
+    font-size: 11px; border-radius: 6px; padding: 2px 7px; margin-right: 8px;
+    border: 1px solid var(--border); color: var(--muted); white-space: nowrap;
+  }
+  .kind-badge.k-video { color: #8fd0ff; border-color: rgba(143, 208, 255, 0.4); }
+  .kind-badge.k-merge { color: #ffb08f; border-color: rgba(255, 176, 143, 0.4); }
+  .kind-badge.k-import { color: #9fffc0; border-color: rgba(159, 255, 192, 0.4); }
+  .empty-tip { color: var(--muted); font-size: 13px; padding: 18px 0; text-align: center; }
+
+  .import-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .import-row input[type="text"] { flex: 1 1 220px; }
+  .import-row input[type="file"] { flex: 1 1 260px; }
+
+  footer { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 40px; opacity: 0.7; }
+  .toast {
+    position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%);
+    background: rgba(20, 22, 48, 0.95); border: 1px solid var(--border);
+    color: var(--text); font-size: 13.5px;
+    padding: 10px 20px; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    z-index: 99;
+  }
+  .toast.show { opacity: 1; }
   @media (max-width: 560px) {
     header h1 { font-size: 32px; }
     .card { padding: 20px; }
@@ -205,21 +247,22 @@
 <body>
 <header>
   <h1>houqishi</h1>
-  <p>视频转 MP3 · 多音频按间隔合成 —— 一个页面全搞定</p>
+  <p>视频转 MP3 · 多音频按间隔合成 · 导入生成链接 —— 所有产物都有可分享链接</p>
 </header>
 
 <main>
-  <!-- 视频转 MP3 -->
+  <!-- 视频转音频（批量 + 合并） -->
   <section class="card">
-    <h2>🎬 视频转 MP3 <span class="tag">提取音频</span></h2>
-    <p class="desc">把视频文件拖进来（或点击选择），服务器用 ffmpeg 提取音轨。<b>默认输出 FLAC 无损音质</b>（保留源采样率与声道），也可选 WAV 无损或 MP3 192k（体积小）。支持 MP4 / MOV / MKV / AVI / WebM 等常见格式。</p>
-    <div class="drop-zone" id="drop-zone">
+    <h2>🎬 视频转 MP3 <span class="tag">批量 + 合并</span></h2>
+    <p class="desc">一次可选择<b>多个视频</b>（也可分批多次转换）。勾选「转换后合并」即按下方每个视频的间隔拼成一段。想分批转换后再合并？转换后到「🎵 音频合成」里从<b>文件库</b>选取即可。</p>
+    <div class="drop-zone" id="video-drop">
       <div class="icon">🎥</div>
-      <div>点击选择，或将视频拖放到这里</div>
-      <div class="hint">单文件最大 200MB</div>
+      <div>点击选择，或将多个视频拖放到这里</div>
+      <div class="hint">单次请求合计最大 200MB</div>
     </div>
-    <input type="file" id="video-input" accept="video/*" hidden>
-    <div class="file-info" id="video-info"></div>
+    <input type="file" id="video-input" accept="video/*" multiple hidden>
+    <div class="file-list" id="video-list"></div>
+    <label class="check-line"><input type="checkbox" id="video-merge" checked> 转换后合并为一段（下方间隔生效，末尾不加静音）</label>
     <div class="format-label">输出格式：</div>
     <div class="format-picker" id="video-format">
       <button type="button" data-fmt="flac" class="active">FLAC 无损</button>
@@ -230,15 +273,17 @@
       <button id="btn-video" disabled>开始转换</button>
     </div>
     <div class="status" id="video-status"></div>
+    <div class="results" id="video-results"></div>
   </section>
 
   <!-- 多音频合成 -->
   <section class="card">
-    <h2>🎵 多 MP3 合成 <span class="tag">可设间隔</span></h2>
-    <p class="desc">按顺序选择多个音频，「间隔」表示该音频播放结束后插入的静音秒数（支持小数，如 1.5）。合成走 PCM 无损链路，<b>默认输出 FLAC 无损</b>（除源文件本身的编码损失外，不引入额外音质损失）。最后一个音频的间隔不会生效，末尾不会附加静音。</p>
+    <h2>🎵 音频合成 <span class="tag">上传 + 文件库</span></h2>
+    <p class="desc">按顺序添加音频：可以上传新文件，也可以从<b>文件库</b>选择已生成的链接，两者可混合排序。为每个音频设置间隔秒数（该音频播放结束后的静音时长）。</p>
     <div class="merge-rows" id="merge-rows"></div>
     <div class="actions">
-      <button class="ghost" id="btn-add-row">＋ 添加音频</button>
+      <button class="ghost" id="btn-add-row">＋ 上传音频</button>
+      <button class="ghost" id="btn-open-library">📚 从文件库选择</button>
       <button id="btn-merge" disabled>开始合成</button>
     </div>
     <div class="format-label">输出格式：</div>
@@ -248,171 +293,439 @@
       <button type="button" data-fmt="mp3">MP3 192k</button>
     </div>
     <div class="status" id="merge-status"></div>
+    <div class="results" id="merge-results"></div>
+    <div class="library-picker" id="library-picker" hidden>
+      <div class="lp-head">
+        <span>📚 选择文件库中的音频</span>
+        <button class="ghost small" id="lp-close">收起</button>
+      </div>
+      <div class="lp-list" id="lp-list"></div>
+      <div class="actions">
+        <button id="lp-add">添加所选到合成列表</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 导入音频 -->
+  <section class="card">
+    <h2>📥 导入音频 <span class="tag">生成链接</span></h2>
+    <p class="desc">导入一个已有的 MP3（或其他格式音频），立即生成可分享的链接，可自定义名称。</p>
+    <div class="import-row">
+      <input type="file" id="import-input" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac">
+      <input type="text" class="text-input" id="import-name" placeholder="自定义名称（可选，如：我的录音）" maxlength="60">
+    </div>
+    <div class="actions">
+      <button id="btn-import" disabled>导入并生成链接</button>
+    </div>
+    <div class="status" id="import-status"></div>
+    <div class="results" id="import-results"></div>
+  </section>
+
+  <!-- 文件库 -->
+  <section class="card">
+    <h2>📚 文件库 <span class="tag">所有链接</span></h2>
+    <p class="desc">所有转换 / 合成 / 导入的产物都在这里，链接可直接复制分享。文件保存在服务临时磁盘，<b>重新部署或超过 48 小时会自动清理</b>，重要文件请及时下载。</p>
+    <div class="actions">
+      <button class="ghost" id="btn-refresh-library">🔄 刷新</button>
+    </div>
+    <div class="lib-table-wrap">
+      <table class="lib-table">
+        <thead>
+          <tr><th>名称</th><th>大小</th><th>时长</th><th>生成时间</th><th>链接</th><th>操作</th></tr>
+        </thead>
+        <tbody id="lib-tbody"></tbody>
+      </table>
+      <div class="empty-tip" id="lib-empty" hidden>还没有文件，去上面转换 / 合成 / 导入一个吧～</div>
+    </div>
   </section>
 </main>
 
-<footer>houqishi · 基于 Flask + ffmpeg · 部署于 Render</footer>
+<footer>houqishi · Flask + ffmpeg · 部署于 Render</footer>
+<div class="toast" id="toast"></div>
 
 <script>
   const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
 
-  /* ---------- 输出格式选择器 ---------- */
+  const state = {
+    videos: [],     // {file, name, size, gap}
+    mergeRows: [],  // {type:'upload'|'id', ref, name, gap, file}
+    library: [],
+  };
+
+  /* ---------- 工具函数 ---------- */
+  function fmtBytes(b) {
+    if (b == null) return '-';
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+    return (b / 1048576).toFixed(2) + ' MB';
+  }
+  function fmtDur(d) {
+    if (d == null) return '-';
+    const m = Math.floor(d / 60), s = d % 60;
+    return m > 0 ? m + ':' + String(Math.floor(s)).padStart(2, '0') : s.toFixed(1) + 's';
+  }
+  function fmtTime(t) {
+    if (!t) return '-';
+    const d = new Date(t * 1000);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  }
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+  const KIND_LABEL = { video: ['视频转换', 'k-video'], merge: ['合成', 'k-merge'], import: ['导入', 'k-import'] };
+
+  let toastTimer = null;
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  async function copyText(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    }
+  }
+
+  async function apiPost(url, fd) {
+    const res = await fetch(url, { method: 'POST', body: fd });
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* ignore */ }
+    if (!res.ok || data.ok === false) throw new Error(data.error || ('HTTP ' + res.status));
+    return data;
+  }
+
+  function linkCardHTML(file) {
+    const url = location.origin + file.url;
+    const kind = KIND_LABEL[file.kind] || ['文件', ''];
+    return `<div class="link-card">
+      <div class="lc-name"><span class="kind-badge ${kind[1]}">${kind[0]}</span>${esc(file.name)}</div>
+      <div class="lc-meta">${fmtBytes(file.size)} · 时长 ${fmtDur(file.duration)}</div>
+      <div class="lc-url"><input type="text" readonly value="${esc(url)}"></div>
+      <div class="lc-actions">
+        <button class="ghost small" data-copy="${esc(url)}">📋 复制链接</button>
+        <a class="ghost small" href="${esc(file.url)}?download=1" download="${esc(file.name)}" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;">⬇️ 下载</a>
+      </div>
+      <audio controls preload="none" src="${esc(file.url)}"></audio>
+    </div>`;
+  }
+
+  // 结果区复制按钮（事件委托）
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-copy]');
+    if (!btn) return;
+    const ok = await copyText(btn.dataset.copy);
+    toast(ok ? '链接已复制 ✅' : '复制失败，请手动复制');
+  });
+
+  /* ---------- 格式选择器 ---------- */
   function bindFormatPicker(sel) {
     const picker = $(sel);
-    picker.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-fmt]");
+    picker.addEventListener('click', (e) => {
+      const btn = e.target.closest('button[data-fmt]');
       if (!btn) return;
-      picker.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
+      picker.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
     });
     return {
       get value() {
-        const active = picker.querySelector("button.active");
-        return active ? active.dataset.fmt : "flac";
+        const active = picker.querySelector('button.active');
+        return active ? active.dataset.fmt : 'flac';
       }
     };
   }
-  const videoFormat = bindFormatPicker("#video-format");
-  const mergeFormat = bindFormatPicker("#merge-format");
+  const videoFormat = bindFormatPicker('#video-format');
+  const mergeFormat = bindFormatPicker('#merge-format');
 
-  async function downloadResponse(res, fallbackName) {
-    const blob = await res.blob();
-    let name = fallbackName;
-    const cd = res.headers.get("Content-Disposition") || "";
-    const m = cd.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
-    if (m) name = decodeURIComponent(m[1]);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  /* ---------- 视频卡片 ---------- */
+  const videoDrop = $('#video-drop');
+  const videoInput = $('#video-input');
+
+  function renderVideos() {
+    const wrap = $('#video-list');
+    wrap.innerHTML = state.videos.map((v, i) => `
+      <div class="file-row has-file">
+        <span class="row-index">${i + 1}</span>
+        <span class="fname" title="${esc(v.name)}">${esc(v.name)} <small>(${fmtBytes(v.size)})</small></span>
+        <div class="gap"><span>间隔</span><input type="number" min="0" step="0.1" value="${v.gap}" data-vgap="${i}"><span>秒</span></div>
+        <button class="icon-btn danger small" data-vdel="${i}" title="移除">✕</button>
+      </div>`).join('');
+    $('#btn-video').disabled = state.videos.length === 0;
   }
 
-  async function readError(res) {
-    try {
-      const data = await res.json();
-      return data.error || ("HTTP " + res.status);
-    } catch (e) {
-      return "HTTP " + res.status;
+  function addVideos(fileList) {
+    for (const f of fileList) {
+      state.videos.push({ file: f, name: f.name, size: f.size, gap: 0 });
     }
+    renderVideos();
   }
 
-  /* ---------- 视频转 MP3 ---------- */
-  const dropZone = $("#drop-zone");
-  const videoInput = $("#video-input");
-  const videoInfo = $("#video-info");
-  const btnVideo = $("#btn-video");
-  const videoStatus = $("#video-status");
-
-  function setVideoFile(file) {
-    if (!file) return;
-    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
-    videoInfo.textContent = "已选择：" + file.name + "（" + sizeMB + " MB）";
-    videoInfo.classList.add("active");
-    btnVideo.disabled = false;
-  }
-  dropZone.addEventListener("click", () => videoInput.click());
-  dropZone.addEventListener("dragover", (e) => { e.preventDefault(); dropZone.classList.add("over"); });
-  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("over"));
-  dropZone.addEventListener("drop", (e) => {
+  videoDrop.addEventListener('click', () => videoInput.click());
+  videoDrop.addEventListener('dragover', (e) => { e.preventDefault(); videoDrop.classList.add('over'); });
+  videoDrop.addEventListener('dragleave', () => videoDrop.classList.remove('over'));
+  videoDrop.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove("over");
-    if (e.dataTransfer.files.length) {
-      videoInput.files = e.dataTransfer.files;
-      setVideoFile(e.dataTransfer.files[0]);
-    }
+    videoDrop.classList.remove('over');
+    if (e.dataTransfer.files.length) addVideos(e.dataTransfer.files);
   });
-  videoInput.addEventListener("change", () => setVideoFile(videoInput.files[0]));
+  videoInput.addEventListener('change', () => {
+    if (videoInput.files.length) addVideos(videoInput.files);
+    videoInput.value = '';
+  });
 
-  btnVideo.addEventListener("click", async () => {
-    const file = videoInput.files[0];
-    if (!file) return;
-    btnVideo.disabled = true;
-    videoStatus.textContent = "⏳ 正在转换，请稍候（大文件可能需要几分钟）…";
-    videoStatus.className = "status busy";
+  $('#video-list').addEventListener('click', (e) => {
+    const del = e.target.closest('button[data-vdel]');
+    if (!del) return;
+    state.videos.splice(Number(del.dataset.vdel), 1);
+    renderVideos();
+  });
+
+  $('#btn-video').addEventListener('click', async () => {
+    if (!state.videos.length) return;
+    const btn = $('#btn-video');
+    btn.disabled = true;
+    $('#video-status').textContent = `⏳ 正在转换 ${state.videos.length} 个视频${$('#video-merge').checked ? '并合并' : ''}，请稍候…`;
+    $('#video-status').className = 'status busy';
     try {
       const fd = new FormData();
-      fd.append("video", file);
-      fd.append("format", videoFormat.value);
-      const res = await fetch("/api/video-to-mp3", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(await readError(res));
-      await downloadResponse(res, "houqishi_audio." + videoFormat.value);
-      videoStatus.textContent = "✅ 转换完成，已开始下载";
-      videoStatus.className = "status ok";
+      state.videos.forEach((v) => fd.append('videos', v.file));
+      $$('#video-list input[data-vgap]').forEach((i) => fd.append('gaps', i.value || '0'));
+      fd.append('format', videoFormat.value);
+      fd.append('merge', $('#video-merge').checked ? '1' : '0');
+      const data = await apiPost('/api/video-to-mp3', fd);
+      let html = '';
+      if (data.files && data.files.length > 1) {
+        html += '<h3>📄 分段结果</h3>' + data.files.map(linkCardHTML).join('');
+      }
+      if (data.merged) {
+        html += '<h3>🔗 合并结果</h3>' + linkCardHTML(data.merged);
+      } else if (data.files && data.files.length === 1) {
+        html = '<h3>🔗 转换结果</h3>' + linkCardHTML(data.files[0]);
+      }
+      $('#video-results').innerHTML = html;
+      $('#video-status').textContent = '✅ 完成，链接已生成';
+      $('#video-status').className = 'status ok';
+      refreshLibrary();
     } catch (err) {
-      videoStatus.textContent = "❌ " + err.message;
-      videoStatus.className = "status err";
+      $('#video-status').textContent = '❌ ' + err.message;
+      $('#video-status').className = 'status err';
     } finally {
-      btnVideo.disabled = false;
+      btn.disabled = false;
     }
   });
 
-  /* ---------- 多音频合成 ---------- */
-  const rowsWrap = $("#merge-rows");
-  const btnMerge = $("#btn-merge");
-  const mergeStatus = $("#merge-status");
-
-  function addRow() {
-    const row = document.createElement("div");
-    row.className = "merge-row";
-    row.innerHTML =
-      '<span class="row-index"></span>' +
-      '<input type="file" class="audio-file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac">' +
-      '<div class="gap"><span>间隔</span><input type="number" class="gap-input" min="0" step="0.1" value="0"><span>秒</span></div>' +
-      '<button class="icon-btn remove" title="移除这一行">✕</button>';
-    row.querySelector(".remove").addEventListener("click", () => { row.remove(); refreshRows(); });
-    row.querySelector(".audio-file").addEventListener("change", refreshRows);
-    rowsWrap.appendChild(row);
-    refreshRows();
+  /* ---------- 合成卡片 ---------- */
+  function renderMergeRows() {
+    const wrap = $('#merge-rows');
+    wrap.innerHTML = state.mergeRows.map((r, i) => `
+      <div class="file-row ${r.file || r.type === 'id' ? 'has-file' : ''}">
+        <span class="row-index">${i + 1}</span>
+        ${r.type === 'upload'
+          ? `<input type="file" class="audio-file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" data-mfile="${i}" style="flex:1 1 200px;min-width:0">`
+          : `<span class="fname"><span class="lib-tag">文件库</span>${esc(r.name)}</span>`}
+        <div class="gap"><span>间隔</span><input type="number" min="0" step="0.1" value="${r.gap}" data-mgap="${i}"><span>秒</span></div>
+        <button class="icon-btn danger small" data-mdel="${i}" title="移除">✕</button>
+      </div>`).join('');
+    $('#btn-merge').disabled = !state.mergeRows.some((r) => r.file || r.type === 'id');
   }
 
-  function refreshRows() {
-    const rows = Array.from(rowsWrap.children);
-    rows.forEach((r, i) => {
-      r.querySelector(".row-index").textContent = i + 1;
-      r.querySelector(".remove").style.visibility = rows.length > 1 ? "visible" : "hidden";
-      r.classList.toggle("has-file", !!r.querySelector(".audio-file").files[0]);
-    });
-    btnMerge.disabled = !rows.some((r) => r.querySelector(".audio-file").files[0]);
+  function addUploadRow() {
+    state.mergeRows.push({ type: 'upload', ref: null, name: '', gap: 0, file: null });
+    renderMergeRows();
   }
 
-  $("#btn-add-row").addEventListener("click", addRow);
+  function addLibraryRows(ids) {
+    for (const id of ids) {
+      const f = state.library.find((x) => x.id === id);
+      if (f) state.mergeRows.push({ type: 'id', ref: id, name: f.name, gap: 0, file: null });
+    }
+    renderMergeRows();
+  }
 
-  btnMerge.addEventListener("click", async () => {
+  $('#btn-add-row').addEventListener('click', addUploadRow);
+  $('#merge-rows').addEventListener('change', (e) => {
+    const inp = e.target.closest('input[data-mfile]');
+    if (!inp || !inp.files.length) return;
+    const idx = Number(inp.dataset.mfile);
+    state.mergeRows[idx].file = inp.files[0];
+    state.mergeRows[idx].name = inp.files[0].name;
+    renderMergeRows();
+  });
+  $('#merge-rows').addEventListener('click', (e) => {
+    const del = e.target.closest('button[data-mdel]');
+    if (!del) return;
+    state.mergeRows.splice(Number(del.dataset.mdel), 1);
+    renderMergeRows();
+  });
+
+  $('#btn-merge').addEventListener('click', async () => {
     const fd = new FormData();
-    let count = 0;
-    for (const row of rowsWrap.children) {
-      const f = row.querySelector(".audio-file").files[0];
-      if (!f) continue;
-      const g = parseFloat(row.querySelector(".gap-input").value);
-      fd.append("files", f);
-      fd.append("gaps", isNaN(g) || g < 0 ? "0" : String(g));
-      count++;
-    }
-    if (!count) return;
-    fd.append("format", mergeFormat.value);
-    btnMerge.disabled = true;
-    mergeStatus.textContent = "⏳ 正在合成 " + count + " 个音频，请稍候…";
-    mergeStatus.className = "status busy";
+    const order = [];
+    let uploadCount = 0;
+    state.mergeRows.forEach((r, i) => {
+      const gapInput = $(`#merge-rows input[data-mgap="${i}"]`);
+      const gap = Math.max(0, parseFloat(gapInput ? gapInput.value : r.gap) || 0);
+      if (r.type === 'upload') {
+        if (!r.file) return;
+        fd.append('files', r.file);
+        order.push({ type: 'upload', ref: String(uploadCount), gap });
+        uploadCount++;
+      } else {
+        order.push({ type: 'id', ref: r.ref, gap });
+      }
+    });
+    if (!order.length) return;
+    fd.append('order', JSON.stringify(order));
+    fd.append('format', mergeFormat.value);
+
+    const btn = $('#btn-merge');
+    btn.disabled = true;
+    $('#merge-status').textContent = '⏳ 正在合成 ' + order.length + ' 个音频，请稍候…';
+    $('#merge-status').className = 'status busy';
     try {
-      const res = await fetch("/api/merge-mp3", { method: "POST", body: fd });
-      if (!res.ok) throw new Error(await readError(res));
-      await downloadResponse(res, "houqishi_merged." + mergeFormat.value);
-      mergeStatus.textContent = "✅ 合成完成，已开始下载";
-      mergeStatus.className = "status ok";
+      const data = await apiPost('/api/merge', fd);
+      $('#merge-results').innerHTML = '<h3>🔗 合成结果</h3>' + linkCardHTML(data.file);
+      $('#merge-status').textContent = '✅ 合成完成，链接已生成';
+      $('#merge-status').className = 'status ok';
+      refreshLibrary();
     } catch (err) {
-      mergeStatus.textContent = "❌ " + err.message;
-      mergeStatus.className = "status err";
+      $('#merge-status').textContent = '❌ ' + err.message;
+      $('#merge-status').className = 'status err';
     } finally {
-      btnMerge.disabled = false;
+      btn.disabled = false;
     }
   });
 
-  addRow();
-  addRow();
+  /* ---------- 文件库选择面板 ---------- */
+  $('#btn-open-library').addEventListener('click', () => {
+    const panel = $('#library-picker');
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) renderLibraryPicker();
+  });
+  $('#lp-close').addEventListener('click', () => { $('#library-picker').hidden = true; });
+
+  function renderLibraryPicker() {
+    const list = $('#lp-list');
+    if (!state.library.length) {
+      list.innerHTML = '<div class="empty-tip">文件库是空的，先转换 / 导入几个音频吧</div>';
+      return;
+    }
+    list.innerHTML = state.library.map((f) => `
+      <label class="lp-item">
+        <input type="checkbox" value="${esc(f.id)}">
+        <span class="lp-name">${esc(f.name)}</span>
+        <span class="lp-meta">${fmtDur(f.duration)} · ${fmtBytes(f.size)}</span>
+      </label>`).join('');
+  }
+
+  $('#lp-add').addEventListener('click', () => {
+    const ids = $$('#lp-list input[type="checkbox"]:checked').map((c) => c.value);
+    if (!ids.length) { toast('请先勾选要添加的文件'); return; }
+    addLibraryRows(ids);
+    $('#library-picker').hidden = true;
+    toast(`已添加 ${ids.length} 个文件到合成列表`);
+  });
+
+  /* ---------- 导入卡片 ---------- */
+  const importInput = $('#import-input');
+  importInput.addEventListener('change', () => {
+    $('#btn-import').disabled = !importInput.files.length;
+  });
+  $('#btn-import').addEventListener('click', async () => {
+    const file = importInput.files[0];
+    if (!file) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    const name = $('#import-name').value.trim();
+    if (name) fd.append('name', name);
+    const btn = $('#btn-import');
+    btn.disabled = true;
+    $('#import-status').textContent = '⏳ 正在导入…';
+    $('#import-status').className = 'status busy';
+    try {
+      const data = await apiPost('/api/import', fd);
+      $('#import-results').innerHTML = '<h3>🔗 导入结果</h3>' + linkCardHTML(data.file);
+      $('#import-status').textContent = '✅ 导入完成，链接已生成';
+      $('#import-status').className = 'status ok';
+      importInput.value = '';
+      $('#import-name').value = '';
+      refreshLibrary();
+    } catch (err) {
+      $('#import-status').textContent = '❌ ' + err.message;
+      $('#import-status').className = 'status err';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  /* ---------- 文件库 ---------- */
+  async function refreshLibrary() {
+    try {
+      const res = await fetch('/api/files');
+      const data = await res.json();
+      state.library = data.files || [];
+      renderLibrary();
+      if (!$('#library-picker').hidden) renderLibraryPicker();
+    } catch (e) { /* ignore */ }
+  }
+
+  function renderLibrary() {
+    const tbody = $('#lib-tbody');
+    $('#lib-empty').hidden = state.library.length > 0;
+    tbody.innerHTML = state.library.map((f) => {
+      const kind = KIND_LABEL[f.kind] || ['文件', ''];
+      const url = location.origin + f.url;
+      return `<tr>
+        <td class="name"><span class="kind-badge ${kind[1]}">${kind[0]}</span>${esc(f.name)}</td>
+        <td>${fmtBytes(f.size)}</td>
+        <td>${fmtDur(f.duration)}</td>
+        <td>${fmtTime(f.createdAt)}</td>
+        <td><a href="${esc(f.url)}" target="_blank" rel="noopener">${esc(f.id)}${esc(f.url.slice(f.url.lastIndexOf('.')))}</a></td>
+        <td class="ops">
+          <button class="ghost small" data-copy="${esc(url)}">复制</button>
+          <a class="ghost small" style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;font-size:12.5px;" href="${esc(f.url)}?download=1" download="${esc(f.name)}">下载</a>
+          <button class="danger small" data-del="${esc(f.id)}">删除</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  $('#btn-refresh-library').addEventListener('click', refreshLibrary);
+  $('#lib-tbody').addEventListener('click', async (e) => {
+    const del = e.target.closest('button[data-del]');
+    if (!del) return;
+    const id = del.dataset.del;
+    try {
+      const res = await fetch('/api/files/' + encodeURIComponent(id), { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || data.ok === false) throw new Error(data.error || '删除失败');
+      toast('已删除');
+      refreshLibrary();
+    } catch (err) {
+      toast('删除失败：' + err.message);
+    }
+  });
+
+  /* ---------- 初始化 ---------- */
+  addUploadRow();
+  refreshLibrary();
 </script>
 </body>
 </html>

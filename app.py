@@ -1,24 +1,37 @@
 """houqishi - Flask Web 服务。
 
+功能：
+  - 视频批量提取音频（mp3/flac/wav，可选转换后直接合并）
+  - 多音频按间隔合成（上传文件 + 文件库链接 混合排序）
+  - 导入已有音频生成链接
+  - 所有产物落盘持久化，返回可分享的 /f/<id> 链接
+
 接口：
-  GET  /                 首页（上传/合成页面）
-  GET  /health           健康检查
-  POST /api/video-to-mp3 上传视频 -> 返回提取出的音频（mp3/flac/wav，默认 flac 无损）
-  POST /api/merge-mp3    上传多个音频 + 每个音频的间隔秒数 -> 返回合成音频
+  GET    /                 首页
+  GET    /health           健康检查
+  GET    /f/<fid>          播放/下载已生成的文件（?download=1 强制下载）
+  GET    /api/files        文件库列表
+  DELETE /api/files/<fid>  删除文件
+  POST   /api/video-to-mp3 批量视频转音频（可选转换后合并）
+  POST   /api/merge        多音频合成
+  POST   /api/import       导入音频生成链接
 """
+import json
 import os
+import re
 import shutil
 import tempfile
 import time
+import uuid
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
-from werkzeug.utils import secure_filename
 
 from media_utils import (
     FORMAT_EXT,
     SUPPORTED_FORMATS,
     MediaError,
     merge_audio_files,
+    probe_duration,
     video_to_audio,
 )
 
@@ -26,6 +39,11 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 单次请求最大 200MB
 
 WORK_DIR = os.path.join(tempfile.gettempdir(), "houqishi_jobs")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STORAGE_DIR = os.environ.get("HOUQISHI_STORAGE", os.path.join(BASE_DIR, "storage"))
+STORAGE_FILES = os.path.join(STORAGE_DIR, "files")
+INDEX_FILE = os.path.join(STORAGE_DIR, "index.json")
+FILE_TTL_HOURS = 48  # 文件保留时长
 
 VIDEO_EXT = {
     ".mp4", ".mov", ".mkv", ".avi", ".webm", ".flv", ".wmv",
@@ -33,12 +51,24 @@ VIDEO_EXT = {
 }
 AUDIO_EXT = {
     ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".oga",
-    ".flac", ".wma", ".opus", ".amr", ".mp4",
+    ".flac", ".wma", ".opus", ".amr",
+}
+AUDIO_MIME = {
+    ".mp3": "audio/mpeg", ".flac": "audio/flac", ".wav": "audio/x-wav",
+    ".m4a": "audio/mp4", ".aac": "audio/aac", ".ogg": "audio/ogg",
+    ".oga": "audio/ogg", ".opus": "audio/ogg", ".wma": "audio/x-ms-wma",
+    ".amr": "audio/amr",
 }
 
 
 def _ext(filename: str) -> str:
     return os.path.splitext(filename or "")[1].lower()
+
+
+def _safe_display_name(name: str) -> str:
+    """清理展示用文件名：去掉路径分隔符与控制字符，保留中文等 Unicode。"""
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]', "", name or "").strip()
+    return cleaned[:80]
 
 
 def _get_format(default: str = "flac") -> str:
@@ -48,15 +78,94 @@ def _get_format(default: str = "flac") -> str:
     return fmt
 
 
-def _cleanup_response(resp, path: str):
-    """响应发送完成后删除临时目录。"""
-    @resp.call_on_close
-    def _cleanup():
-        shutil.rmtree(path, ignore_errors=True)
-    return resp
+# ---------------- 持久化存储 ----------------
+
+def _load_index() -> list:
+    try:
+        with open(INDEX_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
 
 
-def _cleanup_stale_jobs(max_age_hours: int = 2):
+def _save_index(items: list) -> None:
+    os.makedirs(STORAGE_DIR, exist_ok=True)
+    tmp = INDEX_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(items, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, INDEX_FILE)
+
+
+def _file_info(item: dict) -> dict:
+    return {
+        "id": item["id"],
+        "name": item["name"],
+        "url": f"/f/{item['id']}{item['ext']}",
+        "size": item.get("size"),
+        "duration": item.get("duration"),
+        "kind": item.get("kind"),
+        "createdAt": item.get("createdAt"),
+    }
+
+
+def _store_file(src_path: str, name: str, kind: str) -> dict:
+    """把处理结果移入持久化目录并登记，返回文件信息（含链接）。"""
+    ext = _ext(name) or ".mp3"
+    if ext not in AUDIO_MIME:
+        ext = ".mp3"
+    os.makedirs(STORAGE_FILES, exist_ok=True)
+
+    items = _load_index()
+    existing = {it["id"] for it in items}
+    while True:
+        fid = uuid.uuid4().hex[:8]
+        if fid not in existing:
+            break
+
+    dst = os.path.join(STORAGE_FILES, fid + ext)
+    shutil.move(src_path, dst)
+
+    info = {
+        "id": fid,
+        "name": name,
+        "ext": ext,
+        "size": os.path.getsize(dst),
+        "duration": probe_duration(dst),
+        "kind": kind,
+        "createdAt": int(time.time()),
+    }
+    items.append(info)
+    _save_index(items)
+    return _file_info(info)
+
+
+def _find_file(fid: str):
+    for it in _load_index():
+        if it["id"] == fid:
+            return it
+    return None
+
+
+def _cleanup_storage(max_age_hours: int = FILE_TTL_HOURS) -> None:
+    now = time.time()
+    items = _load_index()
+    kept, changed = [], False
+    for it in items:
+        age = now - it.get("createdAt", now)
+        if age > max_age_hours * 3600:
+            try:
+                os.remove(os.path.join(STORAGE_FILES, it["id"] + it["ext"]))
+            except OSError:
+                pass
+            changed = True
+        else:
+            kept.append(it)
+    if changed:
+        _save_index(kept)
+
+
+def _cleanup_stale_jobs(max_age_hours: int = 2) -> None:
     try:
         now = time.time()
         for name in os.listdir(WORK_DIR):
@@ -66,6 +175,14 @@ def _cleanup_stale_jobs(max_age_hours: int = 2):
     except OSError:
         pass
 
+
+try:
+    os.makedirs(STORAGE_FILES, exist_ok=True)
+except OSError:
+    pass
+
+
+# ---------------- 页面路由 ----------------
 
 @app.get("/")
 def index():
@@ -77,100 +194,243 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/f/<fid>")
+def serve_file(fid: str):
+    base, _ext_in_url = os.path.splitext(fid)
+    item = _find_file(base)
+    if not item:
+        return "文件不存在或已过期", 404
+    filename = base + item["ext"]
+    path = os.path.join(STORAGE_FILES, filename)
+    if not os.path.isfile(path):
+        return "文件不存在或已过期", 404
+    as_attachment = request.args.get("download") in ("1", "true", "yes")
+    return send_from_directory(
+        STORAGE_FILES, filename,
+        mimetype=AUDIO_MIME.get(item["ext"], "application/octet-stream"),
+        as_attachment=as_attachment,
+        download_name=item["name"],
+    )
+
+
+# ---------------- 文件库 API ----------------
+
+@app.get("/api/files")
+def api_files():
+    _cleanup_storage()
+    items = _load_index()
+    items.sort(key=lambda x: x.get("createdAt", 0), reverse=True)
+    return jsonify({"ok": True, "files": [_file_info(it) for it in items]})
+
+
+@app.delete("/api/files/<fid>")
+def api_delete_file(fid: str):
+    items = _load_index()
+    item = next((it for it in items if it["id"] == fid), None)
+    if not item:
+        return jsonify({"ok": False, "error": "文件不存在"}), 404
+    try:
+        os.remove(os.path.join(STORAGE_FILES, fid + item["ext"]))
+    except OSError:
+        pass
+    _save_index([it for it in items if it["id"] != fid])
+    return jsonify({"ok": True})
+
+
+# ---------------- 视频转音频（批量 + 可选合并） ----------------
+
 @app.post("/api/video-to-mp3")
 def api_video_to_mp3():
-    file = request.files.get("video")
-    if not file or not file.filename:
-        return jsonify({"error": "请先上传视频文件"}), 400
+    files = [f for f in (request.files.getlist("videos") + request.files.getlist("video")) if f and f.filename]
+    if not files:
+        return jsonify({"ok": False, "error": "请先上传视频文件"}), 400
 
-    ext = _ext(file.filename)
-    if ext not in VIDEO_EXT:
-        return jsonify({"error": f"不支持的视频格式：{ext or '未知'}"}), 400
+    for f in files:
+        ext = _ext(f.filename)
+        if ext not in VIDEO_EXT:
+            return jsonify({"ok": False, "error": f"不支持的视频格式：{f.filename}"}), 400
 
     try:
         fmt = _get_format()
     except MediaError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+    merge_after = request.form.get("merge") in ("1", "true", "yes", "on")
+    gaps_raw = request.form.getlist("gaps")
 
     os.makedirs(WORK_DIR, exist_ok=True)
     _cleanup_stale_jobs()
     workdir = tempfile.mkdtemp(prefix="vid_", dir=WORK_DIR)
 
     try:
-        in_path = os.path.join(workdir, "input" + ext)
-        file.save(in_path)
+        results = []
+        for i, f in enumerate(files):
+            in_path = os.path.join(workdir, f"in_{i:04d}" + _ext(f.filename))
+            f.save(in_path)
 
-        base = secure_filename(os.path.splitext(file.filename)[0]) or "audio"
-        out_name = base + FORMAT_EXT[fmt]
-        out_path = os.path.join(workdir, out_name)
-        video_to_audio(in_path, out_path, fmt)
+            base = _safe_display_name(os.path.splitext(f.filename)[0]) or f"video_{i + 1}"
+            tmp_out = os.path.join(workdir, f"out_{i:04d}" + FORMAT_EXT[fmt])
+            video_to_audio(in_path, tmp_out, fmt)
+            results.append(_store_file(tmp_out, base + FORMAT_EXT[fmt], "video"))
+
+        merged = None
+        if merge_after and len(results) > 1:
+            gaps = []
+            for i in range(len(results)):
+                g = 0.0
+                if i < len(gaps_raw) and gaps_raw[i] not in ("", None):
+                    try:
+                        g = max(0.0, float(gaps_raw[i]))
+                    except ValueError:
+                        g = 0.0
+                gaps.append(g)
+            merged_out = os.path.join(workdir, "merged" + FORMAT_EXT[fmt])
+            stored_paths = [
+                os.path.join(STORAGE_FILES, r["id"] + _stored_ext(r["id"]))
+                for r in results
+            ]
+            merge_audio_files(stored_paths, gaps, merged_out, fmt)
+            merged = _store_file(merged_out, "houqishi_merged" + FORMAT_EXT[fmt], "merge")
     except MediaError as e:
         shutil.rmtree(workdir, ignore_errors=True)
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"ok": False, "error": str(e)}), 500
     except Exception:
         shutil.rmtree(workdir, ignore_errors=True)
-        return jsonify({"error": "服务器内部错误，请重试"}), 500
+        return jsonify({"ok": False, "error": "服务器内部错误，请重试"}), 500
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
 
-    resp = send_from_directory(workdir, out_name, as_attachment=True)
-    return _cleanup_response(resp, workdir)
+    return jsonify({"ok": True, "files": results, "merged": merged})
 
 
-@app.post("/api/merge-mp3")
-def api_merge_mp3():
-    files = request.files.getlist("files")
-    gaps_raw = request.form.getlist("gaps")
+def _stored_ext(fid: str) -> str:
+    item = _find_file(fid)
+    return item["ext"] if item else ".mp3"
 
+
+# ---------------- 多音频合成 ----------------
+
+@app.post("/api/merge")
+def api_merge():
     try:
         fmt = _get_format()
     except MediaError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify({"ok": False, "error": str(e)}), 400
 
-    entries = []  # (FileStorage, gap_seconds)
-    for i, f in enumerate(files):
-        if not f or not f.filename:
-            continue
-        ext = _ext(f.filename)
-        if ext not in AUDIO_EXT:
-            return jsonify({"error": f"不支持的音频格式：{f.filename}"}), 400
-        gap = 0.0
-        if i < len(gaps_raw) and gaps_raw[i] not in ("", None):
-            try:
-                gap = float(gaps_raw[i])
-            except ValueError:
-                return jsonify({"error": "间隔时间必须是数字"}), 400
-        entries.append((f, max(0.0, gap)))
+    uploads = [f for f in request.files.getlist("files") if f and f.filename]
+    for f in uploads:
+        if _ext(f.filename) not in AUDIO_EXT:
+            return jsonify({"ok": False, "error": f"不支持的音频格式：{f.filename}"}), 400
 
-    if not entries:
-        return jsonify({"error": "请至少上传一个音频文件"}), 400
-
+    # order: JSON 数组，[{type: upload|id, ref: "0"|文件id, gap: 秒数}]
+    sources = []  # (path, gap)
+    order_raw = request.form.get("order")
     os.makedirs(WORK_DIR, exist_ok=True)
     _cleanup_stale_jobs()
     workdir = tempfile.mkdtemp(prefix="mrg_", dir=WORK_DIR)
 
     try:
-        input_paths = []
-        for i, (f, _gap) in enumerate(entries):
-            p = os.path.join(workdir, f"in_{i:04d}" + _ext(f.filename))
-            f.save(p)
-            input_paths.append(p)
+        if order_raw:
+            try:
+                order = json.loads(order_raw)
+                if not isinstance(order, list):
+                    raise ValueError
+            except ValueError:
+                return jsonify({"ok": False, "error": "合成列表格式错误"}), 400
 
-        out_name = "houqishi_merged" + FORMAT_EXT[fmt]
-        out_path = os.path.join(workdir, out_name)
-        merge_audio_files(input_paths, [g for _, g in entries], out_path, fmt)
+            for entry in order:
+                if not isinstance(entry, dict):
+                    return jsonify({"ok": False, "error": "合成列表格式错误"}), 400
+                try:
+                    gap = max(0.0, float(entry.get("gap", 0)))
+                except (TypeError, ValueError):
+                    gap = 0.0
+                etype = entry.get("type")
+                ref = str(entry.get("ref", ""))
+                if etype == "upload":
+                    idx = int(ref) if ref.isdigit() else -1
+                    if idx < 0 or idx >= len(uploads):
+                        return jsonify({"ok": False, "error": "上传文件引用错误"}), 400
+                    p = os.path.join(workdir, f"up_{len(sources):04d}" + _ext(uploads[idx].filename))
+                    uploads[idx].save(p)
+                    sources.append((p, gap))
+                elif etype == "id":
+                    item = _find_file(ref)
+                    if not item:
+                        return jsonify({"ok": False, "error": f"文件库中不存在：{ref}"}), 400
+                    sources.append((os.path.join(STORAGE_FILES, ref + item["ext"]), gap))
+                else:
+                    return jsonify({"ok": False, "error": "合成列表格式错误"}), 400
+        else:
+            # 兼容旧调用方式：files + gaps 平行列表
+            gaps_raw = request.form.getlist("gaps")
+            for i, f in enumerate(uploads):
+                g = 0.0
+                if i < len(gaps_raw) and gaps_raw[i] not in ("", None):
+                    try:
+                        g = max(0.0, float(gaps_raw[i]))
+                    except ValueError:
+                        g = 0.0
+                p = os.path.join(workdir, f"up_{i:04d}" + _ext(f.filename))
+                f.save(p)
+                sources.append((p, g))
+
+        if not sources:
+            return jsonify({"ok": False, "error": "请至少添加一个音频"}), 400
+
+        out_path = os.path.join(workdir, "merged" + FORMAT_EXT[fmt])
+        merge_audio_files([p for p, _ in sources], [g for _, g in sources], out_path, fmt)
+        info = _store_file(out_path, "houqishi_merged" + FORMAT_EXT[fmt], "merge")
     except MediaError as e:
         shutil.rmtree(workdir, ignore_errors=True)
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"ok": False, "error": str(e)}), 500
     except Exception:
         shutil.rmtree(workdir, ignore_errors=True)
-        return jsonify({"error": "服务器内部错误，请重试"}), 500
+        return jsonify({"ok": False, "error": "服务器内部错误，请重试"}), 500
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
 
-    resp = send_from_directory(workdir, out_name, as_attachment=True)
-    return _cleanup_response(resp, workdir)
+    return jsonify({"ok": True, "file": info})
+
+
+# ---------------- 导入音频 ----------------
+
+@app.post("/api/import")
+def api_import():
+    f = request.files.get("file")
+    if not f or not f.filename:
+        return jsonify({"ok": False, "error": "请先选择音频文件"}), 400
+
+    ext = _ext(f.filename)
+    if ext not in AUDIO_EXT:
+        return jsonify({"ok": False, "error": f"不支持的音频格式：{f.filename}"}), 400
+
+    custom = (request.form.get("name") or "").strip()
+    if custom:
+        name = (_safe_display_name(custom) or "audio") + ext
+    else:
+        name = (_safe_display_name(f.filename) or "audio")
+        if not name.lower().endswith(ext):
+            name += ext
+
+    os.makedirs(WORK_DIR, exist_ok=True)
+    workdir = tempfile.mkdtemp(prefix="imp_", dir=WORK_DIR)
+    try:
+        tmp_path = os.path.join(workdir, "import" + ext)
+        f.save(tmp_path)
+        info = _store_file(tmp_path, name, "import")
+    except Exception:
+        shutil.rmtree(workdir, ignore_errors=True)
+        return jsonify({"ok": False, "error": "服务器内部错误，请重试"}), 500
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+    return jsonify({"ok": True, "file": info})
 
 
 @app.errorhandler(413)
 def too_large(_e):
-    return jsonify({"error": "文件太大，单次请求上限 200MB"}), 413
+    return jsonify({"ok": False, "error": "文件太大，单次请求上限 200MB"}), 413
 
 
 if __name__ == "__main__":

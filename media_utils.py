@@ -57,6 +57,21 @@ def has_audio_stream(path: str) -> bool:
     return proc.returncode == 0 and proc.stdout.strip() != ""
 
 
+def probe_duration(path: str):
+    """返回音频时长（秒，保留两位小数），失败返回 None。"""
+    cmd = [
+        FFPROBE, "-v", "error", "-show_entries", "format=duration",
+        "-of", "csv=p=0", path,
+    ]
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
+        if proc.returncode == 0 and proc.stdout.strip():
+            return round(float(proc.stdout.strip()), 2)
+    except Exception:
+        pass
+    return None
+
+
 def _audio_encode_args(fmt: str) -> list:
     """返回对应格式的 ffmpeg 音频编码参数。"""
     if fmt == "mp3":
