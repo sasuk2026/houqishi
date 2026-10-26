@@ -1,4 +1,10 @@
-"""houqishi - 媒体处理核心逻辑（视频提取 MP3 / 多音频按间隔合成）。"""
+"""houqishi - 媒体处理核心逻辑（视频提取音频 / 多音频按间隔合成）。
+
+输出格式：
+  mp3  - libmp3lame 192kbps（有损，体积小）
+  flac - FLAC 无损压缩（默认推荐）
+  wav  - PCM 16bit 无损（未压缩，体积大）
+"""
 import os
 import shutil
 import subprocess
@@ -8,8 +14,12 @@ FFMPEG = os.environ.get("FFMPEG_BIN", "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE_BIN", "ffprobe")
 
 SAMPLE_RATE = 44100
-BITRATE = "192k"
+MP3_BITRATE = "192k"
+FLAC_LEVEL = 8  # FLAC 压缩级别 0-8，8 = 体积最小
 CMD_TIMEOUT = 1800  # 单个 ffmpeg 命令最长 30 分钟
+
+SUPPORTED_FORMATS = ("mp3", "flac", "wav")
+FORMAT_EXT = {"mp3": ".mp3", "flac": ".flac", "wav": ".wav"}
 
 
 class MediaError(Exception):
@@ -47,30 +57,52 @@ def has_audio_stream(path: str) -> bool:
     return proc.returncode == 0 and proc.stdout.strip() != ""
 
 
-def video_to_mp3(input_path: str, output_path: str, bitrate: str = BITRATE) -> None:
-    """从视频中提取音频并编码为 MP3。"""
+def _audio_encode_args(fmt: str) -> list:
+    """返回对应格式的 ffmpeg 音频编码参数。"""
+    if fmt == "mp3":
+        return ["-c:a", "libmp3lame", "-b:a", MP3_BITRATE]
+    if fmt == "flac":
+        return ["-c:a", "flac", "-compression_level", str(FLAC_LEVEL)]
+    if fmt == "wav":
+        return ["-c:a", "pcm_s16le"]
+    raise MediaError(f"不支持的输出格式：{fmt}")
+
+
+def video_to_audio(input_path: str, output_path: str, fmt: str = "flac") -> None:
+    """从视频中提取音频并按指定格式输出。
+
+    FLAC / WAV 为无损输出，保留源采样率与声道数，不做重采样。
+    """
+    if fmt not in SUPPORTED_FORMATS:
+        raise MediaError(f"不支持的输出格式：{fmt}")
     if not has_audio_stream(input_path):
-        raise MediaError("该视频没有音轨，无法提取 MP3")
+        raise MediaError("该视频没有音轨，无法提取音频")
     cmd = [
         FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
         "-i", input_path,
         "-vn",                       # 丢弃视频流
-        "-c:a", "libmp3lame",
-        "-b:a", bitrate,
+        *_audio_encode_args(fmt),
         output_path,
     ]
     _run(cmd)
 
 
 def merge_audio_files(input_paths: list, gaps: list, output_path: str,
-                      sample_rate: int = SAMPLE_RATE, bitrate: str = BITRATE) -> None:
-    """把多个音频按顺序合成一个 MP3。
+                      fmt: str = "flac",
+                      sample_rate: int = SAMPLE_RATE) -> None:
+    """把多个音频按顺序合成一个文件。
 
     gaps[i] 表示第 i 个音频播放结束后插入的静音秒数；
     最后一个音频之后的间隔会被忽略（末尾不加静音）。
+
+    合成全程走 PCM 中间链：解码 -> 统一 44.1kHz/16bit/立体声 ->
+    无损拼接 -> 编码为目标格式。FLAC / WAV 输出为无损，
+    除源文件本身的编码损失外不引入任何额外音质损失。
     """
     if not input_paths:
         raise MediaError("没有待合并的音频文件")
+    if fmt not in SUPPORTED_FORMATS:
+        raise MediaError(f"不支持的输出格式：{fmt}")
 
     gaps = list(gaps or [])
     while len(gaps) < len(input_paths):
@@ -110,7 +142,7 @@ def merge_audio_files(input_paths: list, gaps: list, output_path: str,
             for seg in segments:
                 f.write(f"file '{seg}'\n")
 
-        # 3. 无损拼接后编码为 MP3
+        # 3. 无损拼接（PCM concat，无重编码）
         inter = os.path.join(tmp, "inter.wav")
         _run([
             FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
@@ -118,11 +150,16 @@ def merge_audio_files(input_paths: list, gaps: list, output_path: str,
             "-i", list_file,
             "-c:a", "pcm_s16le", inter,
         ])
-        _run([
-            FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
-            "-i", inter,
-            "-codec:a", "libmp3lame", "-b:a", bitrate,
-            output_path,
-        ])
+
+        # 4. 编码为目标格式（WAV 直接复用中间产物，零损耗）
+        if fmt == "wav":
+            shutil.copyfile(inter, output_path)
+        else:
+            _run([
+                FFMPEG, "-y", "-hide_banner", "-loglevel", "error",
+                "-i", inter,
+                *_audio_encode_args(fmt),
+                output_path,
+            ])
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

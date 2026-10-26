@@ -3,8 +3,8 @@
 接口：
   GET  /                 首页（上传/合成页面）
   GET  /health           健康检查
-  POST /api/video-to-mp3 上传视频 -> 返回提取出的 MP3
-  POST /api/merge-mp3    上传多个音频 + 每个音频的间隔秒数 -> 返回合成 MP3
+  POST /api/video-to-mp3 上传视频 -> 返回提取出的音频（mp3/flac/wav，默认 flac 无损）
+  POST /api/merge-mp3    上传多个音频 + 每个音频的间隔秒数 -> 返回合成音频
 """
 import os
 import shutil
@@ -14,7 +14,13 @@ import time
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from werkzeug.utils import secure_filename
 
-from media_utils import MediaError, merge_audio_files, video_to_mp3
+from media_utils import (
+    FORMAT_EXT,
+    SUPPORTED_FORMATS,
+    MediaError,
+    merge_audio_files,
+    video_to_audio,
+)
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 200 * 1024 * 1024  # 单次请求最大 200MB
@@ -33,6 +39,13 @@ AUDIO_EXT = {
 
 def _ext(filename: str) -> str:
     return os.path.splitext(filename or "")[1].lower()
+
+
+def _get_format(default: str = "flac") -> str:
+    fmt = (request.form.get("format") or request.args.get("format") or default).lower()
+    if fmt not in SUPPORTED_FORMATS:
+        raise MediaError(f"不支持的输出格式：{fmt}（可选 mp3 / flac / wav）")
+    return fmt
 
 
 def _cleanup_response(resp, path: str):
@@ -74,6 +87,11 @@ def api_video_to_mp3():
     if ext not in VIDEO_EXT:
         return jsonify({"error": f"不支持的视频格式：{ext or '未知'}"}), 400
 
+    try:
+        fmt = _get_format()
+    except MediaError as e:
+        return jsonify({"error": str(e)}), 400
+
     os.makedirs(WORK_DIR, exist_ok=True)
     _cleanup_stale_jobs()
     workdir = tempfile.mkdtemp(prefix="vid_", dir=WORK_DIR)
@@ -83,9 +101,9 @@ def api_video_to_mp3():
         file.save(in_path)
 
         base = secure_filename(os.path.splitext(file.filename)[0]) or "audio"
-        out_name = base + ".mp3"
+        out_name = base + FORMAT_EXT[fmt]
         out_path = os.path.join(workdir, out_name)
-        video_to_mp3(in_path, out_path)
+        video_to_audio(in_path, out_path, fmt)
     except MediaError as e:
         shutil.rmtree(workdir, ignore_errors=True)
         return jsonify({"error": str(e)}), 500
@@ -101,6 +119,11 @@ def api_video_to_mp3():
 def api_merge_mp3():
     files = request.files.getlist("files")
     gaps_raw = request.form.getlist("gaps")
+
+    try:
+        fmt = _get_format()
+    except MediaError as e:
+        return jsonify({"error": str(e)}), 400
 
     entries = []  # (FileStorage, gap_seconds)
     for i, f in enumerate(files):
@@ -131,8 +154,9 @@ def api_merge_mp3():
             f.save(p)
             input_paths.append(p)
 
-        out_path = os.path.join(workdir, "houqishi_merged.mp3")
-        merge_audio_files(input_paths, [g for _, g in entries], out_path)
+        out_name = "houqishi_merged" + FORMAT_EXT[fmt]
+        out_path = os.path.join(workdir, out_name)
+        merge_audio_files(input_paths, [g for _, g in entries], out_path, fmt)
     except MediaError as e:
         shutil.rmtree(workdir, ignore_errors=True)
         return jsonify({"error": str(e)}), 500
@@ -140,7 +164,7 @@ def api_merge_mp3():
         shutil.rmtree(workdir, ignore_errors=True)
         return jsonify({"error": "服务器内部错误，请重试"}), 500
 
-    resp = send_from_directory(workdir, "houqishi_merged.mp3", as_attachment=True)
+    resp = send_from_directory(workdir, out_name, as_attachment=True)
     return _cleanup_response(resp, workdir)
 
 

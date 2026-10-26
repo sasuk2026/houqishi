@@ -171,6 +171,30 @@
   }
   .icon-btn:hover { color: var(--err); border-color: var(--err); transform: none; }
 
+  .format-picker {
+    display: inline-flex;
+    gap: 6px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    margin-top: 16px;
+  }
+  .format-picker button {
+    box-shadow: none;
+    background: transparent;
+    padding: 7px 14px;
+    font-size: 13px;
+    border-radius: 8px;
+    color: var(--muted);
+  }
+  .format-picker button:hover:not(.active) { color: var(--text); transform: none; }
+  .format-picker button.active {
+    background: linear-gradient(120deg, var(--accent), var(--accent-2));
+    color: #fff;
+  }
+  .format-label { font-size: 13px; color: var(--muted); margin-top: 16px; margin-bottom: -10px; }
+
   footer { text-align: center; color: var(--muted); font-size: 12.5px; margin-top: 44px; opacity: 0.7; }
   @media (max-width: 560px) {
     header h1 { font-size: 32px; }
@@ -188,7 +212,7 @@
   <!-- 视频转 MP3 -->
   <section class="card">
     <h2>🎬 视频转 MP3 <span class="tag">提取音频</span></h2>
-    <p class="desc">把视频文件拖进来（或点击选择），服务器用 ffmpeg 提取音轨并编码为 192kbps MP3。支持 MP4 / MOV / MKV / AVI / WebM 等常见格式。</p>
+    <p class="desc">把视频文件拖进来（或点击选择），服务器用 ffmpeg 提取音轨。<b>默认输出 FLAC 无损音质</b>（保留源采样率与声道），也可选 WAV 无损或 MP3 192k（体积小）。支持 MP4 / MOV / MKV / AVI / WebM 等常见格式。</p>
     <div class="drop-zone" id="drop-zone">
       <div class="icon">🎥</div>
       <div>点击选择，或将视频拖放到这里</div>
@@ -196,6 +220,12 @@
     </div>
     <input type="file" id="video-input" accept="video/*" hidden>
     <div class="file-info" id="video-info"></div>
+    <div class="format-label">输出格式：</div>
+    <div class="format-picker" id="video-format">
+      <button type="button" data-fmt="flac" class="active">FLAC 无损</button>
+      <button type="button" data-fmt="wav">WAV 无损</button>
+      <button type="button" data-fmt="mp3">MP3 192k</button>
+    </div>
     <div class="actions">
       <button id="btn-video" disabled>开始转换</button>
     </div>
@@ -205,11 +235,17 @@
   <!-- 多音频合成 -->
   <section class="card">
     <h2>🎵 多 MP3 合成 <span class="tag">可设间隔</span></h2>
-    <p class="desc">按顺序选择多个音频，「间隔」表示该音频播放结束后插入的静音秒数（支持小数，如 1.5）。最后一个音频的间隔不会生效，末尾不会附加静音。</p>
+    <p class="desc">按顺序选择多个音频，「间隔」表示该音频播放结束后插入的静音秒数（支持小数，如 1.5）。合成走 PCM 无损链路，<b>默认输出 FLAC 无损</b>（除源文件本身的编码损失外，不引入额外音质损失）。最后一个音频的间隔不会生效，末尾不会附加静音。</p>
     <div class="merge-rows" id="merge-rows"></div>
     <div class="actions">
       <button class="ghost" id="btn-add-row">＋ 添加音频</button>
       <button id="btn-merge" disabled>开始合成</button>
+    </div>
+    <div class="format-label">输出格式：</div>
+    <div class="format-picker" id="merge-format">
+      <button type="button" data-fmt="flac" class="active">FLAC 无损</button>
+      <button type="button" data-fmt="wav">WAV 无损</button>
+      <button type="button" data-fmt="mp3">MP3 192k</button>
     </div>
     <div class="status" id="merge-status"></div>
   </section>
@@ -219,6 +255,25 @@
 
 <script>
   const $ = (s) => document.querySelector(s);
+
+  /* ---------- 输出格式选择器 ---------- */
+  function bindFormatPicker(sel) {
+    const picker = $(sel);
+    picker.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-fmt]");
+      if (!btn) return;
+      picker.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+    });
+    return {
+      get value() {
+        const active = picker.querySelector("button.active");
+        return active ? active.dataset.fmt : "flac";
+      }
+    };
+  }
+  const videoFormat = bindFormatPicker("#video-format");
+  const mergeFormat = bindFormatPicker("#merge-format");
 
   async function downloadResponse(res, fallbackName) {
     const blob = await res.blob();
@@ -281,9 +336,10 @@
     try {
       const fd = new FormData();
       fd.append("video", file);
+      fd.append("format", videoFormat.value);
       const res = await fetch("/api/video-to-mp3", { method: "POST", body: fd });
       if (!res.ok) throw new Error(await readError(res));
-      await downloadResponse(res, "houqishi_audio.mp3");
+      await downloadResponse(res, "houqishi_audio." + videoFormat.value);
       videoStatus.textContent = "✅ 转换完成，已开始下载";
       videoStatus.className = "status ok";
     } catch (err) {
@@ -337,13 +393,14 @@
       count++;
     }
     if (!count) return;
+    fd.append("format", mergeFormat.value);
     btnMerge.disabled = true;
     mergeStatus.textContent = "⏳ 正在合成 " + count + " 个音频，请稍候…";
     mergeStatus.className = "status busy";
     try {
       const res = await fetch("/api/merge-mp3", { method: "POST", body: fd });
       if (!res.ok) throw new Error(await readError(res));
-      await downloadResponse(res, "houqishi_merged.mp3");
+      await downloadResponse(res, "houqishi_merged." + mergeFormat.value);
       mergeStatus.textContent = "✅ 合成完成，已开始下载";
       mergeStatus.className = "status ok";
     } catch (err) {
